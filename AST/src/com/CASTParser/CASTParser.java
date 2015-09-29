@@ -12,12 +12,15 @@ import java.util.Set;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 
 import com.CASTVistitors.CASTVisitor;
+import com.CASTVistitors.CASTVisitorSyn;
 import com.Information.ThreadInformation;
 import com.Information.ThreadVar;
 import com.MDGHandle.Edges.Edge;
 import com.MDGHandle.Edges.ThreadEdgeType;
 import com.MDGHandle.Nodes.Node;
+import com.MDGHandle.Nodes.ThreadNotifyNode;
 import com.MDGHandle.Nodes.ThreadTriggerNode;
+import com.MDGHandle.Nodes.ThreadWaitNode;
 
 public class CASTParser {
 	private String projectPath;
@@ -44,8 +47,9 @@ public class CASTParser {
 		castCreater.createASTs();
 		ArrayList<CompileUnit> compileUnits = cFileASTRequestor.getCompileUnits();
 		//用于获取线程相关类的信息，线程变量集，线程启动点
-		CASTVisitor castVisitor = new CASTVisitor(threadsInfo,threadVarHashMap,threadTriggerNodes);
-		castVisitor.traverse(compileUnits);
+//		CASTVisitor castVisitor = new CASTVisitor(threadsInfo,threadVarHashMap,threadTriggerNodes);
+//		castVisitor.traverse(compileUnits);
+		synchronizeParser(compileUnits);
 		
 		//打印线程类信息
 		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
@@ -101,6 +105,18 @@ public class CASTParser {
 		}
 	}
 	
+	public void synchronizeParser(ArrayList<CompileUnit> compileUnits) {
+		CASTVisitorSyn castVisitorSyn = new CASTVisitorSyn();
+		castVisitorSyn.traverse(compileUnits);
+		ArrayList<ThreadNotifyNode> threadNotifyNodes = castVisitorSyn.getThreadNotifyNodes();
+		ArrayList<ThreadWaitNode> threadWaitNodes = castVisitorSyn.getThreadWaitNodes();
+		for (ThreadNotifyNode threadNotifyNode : threadNotifyNodes) {
+			System.out.println(threadNotifyNode);
+		}
+		for (ThreadWaitNode threadWaitNode : threadWaitNodes) {
+			System.out.println(threadWaitNode);
+		}
+	}
 	public void  printFiles() {
 		for (String fileName : filePathList) {
 			System.out.println(fileName);
