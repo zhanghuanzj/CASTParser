@@ -1,7 +1,8 @@
 package com.MDGHandle.Edges;
 
 public enum ThreadEdgeType {
-	THREADTRIGGER("THREADTRIGGER");
+	THREADTRIGGER("THREADTRIGGER"),
+	THREADSYND("THREADSYND");
 	private String threadEdgeType;
 
 	private ThreadEdgeType(String threadEdgeType) {

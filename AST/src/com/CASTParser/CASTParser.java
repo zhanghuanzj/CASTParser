@@ -3,6 +3,7 @@ package com.CASTParser;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class CASTParser {
 	private ArrayList<String> filePathList;
 	private HashMap<String, ThreadInformation> threadsInfo;
 	private HashMap<String, ThreadVar> threadVarHashMap;
+	private Set<String> threadRelate;
 	private ArrayList<ThreadTriggerNode> threadTriggerNodes;
 	//构造函数
 	public CASTParser(String projectPath) {
@@ -35,6 +37,7 @@ public class CASTParser {
 		threadsInfo = new HashMap<>();	
 		threadVarHashMap = new HashMap<>();
 		threadTriggerNodes = new ArrayList<>();
+		threadRelate = new HashSet<>();
 	}
 	
 	
@@ -46,35 +49,56 @@ public class CASTParser {
 		CASTCreater castCreater = new CASTCreater(projectPath,cFileASTRequestor);
 		castCreater.createASTs();
 		ArrayList<CompileUnit> compileUnits = cFileASTRequestor.getCompileUnits();
+		
+
 		//用于获取线程相关类的信息，线程变量集，线程启动点
-//		CASTVisitor castVisitor = new CASTVisitor(threadsInfo,threadVarHashMap,threadTriggerNodes);
-//		castVisitor.traverse(compileUnits);
+		CASTVisitor castVisitor = new CASTVisitor(threadsInfo,threadVarHashMap,threadTriggerNodes);
+		castVisitor.traverse(compileUnits);
+		
+		ThreadVar[] threadVarArray = new ThreadVar[threadVarHashMap.size()];
+		threadVarHashMap.values().toArray(threadVarArray);
+		System.out.println("ThreadVarArray :"+threadVarArray.length);
+		for (ThreadVar threadVar1 : threadVarArray) {
+			for (ThreadVar threadVar2 : threadVarArray) {
+				if (threadVar1.getFilePath().equals(threadVar2.getFilePath())) {
+					System.out.println("Tn the same file");
+					threadRelate.add(threadVar1.getBindingTypeName()+threadVar2.getBindingTypeName());
+					threadRelate.add(threadVar2.getBindingTypeName()+threadVar1.getBindingTypeName());					
+				}
+			}
+		}
+		System.out.println("Total ThreadRelate :"+threadRelate.size());
+		for (String threadRel : threadRelate) {
+			System.out.println("ThreadRelate:::"+threadRel);
+		}
+		
 		synchronizeParser(compileUnits);
 		
+
 		//打印线程类信息
-		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
-		for (Entry<String, ThreadInformation> entry : threadInfomations) {
-			System.out.println("______________________________THREAD_INFO_HASHMAP____________________________________");
-			System.out.println("KEY: "+entry.getKey());
-			System.out.println(entry.getValue());
-			System.out.println("______________________________THREAD_INFO_HASHMAP____________________________________");
-		}
-		
-		//打印线程变量信息
-		Set<Map.Entry<String, ThreadVar>> threadVars = threadVarHashMap.entrySet();
-		for (Entry<String, ThreadVar> entry : threadVars) {
-			System.out.println("______________________________THREAD_VAR_HASHMAP____________________________________");
-			System.out.println("KEY: "+entry.getKey());
-			System.out.println(entry.getValue());
-			System.out.println("______________________________THREAD_VAR_HASHMAP____________________________________");
-		}
-		
-		//打印线程触发节点
-		for (ThreadTriggerNode threadTiggerNode : threadTriggerNodes) {
-			System.out.println("_____________________________TRIGGER_TRIGGER_NODE___________________________________");
-			System.out.println(threadTiggerNode);
-			System.out.println("_____________________________TRIGGER_TRIGGER_NODE___________________________________");
-		}
+//		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
+//		for (Entry<String, ThreadInformation> entry : threadInfomations) {
+//			System.out.println("______________________________THREAD_INFO_HASHMAP____________________________________");
+//			System.out.println("KEY: "+entry.getKey());
+//			System.out.println(entry.getValue());
+//			System.out.println("______________________________THREAD_INFO_HASHMAP____________________________________");
+//		}
+//		
+//		//打印线程变量信息
+//		Set<Map.Entry<String, ThreadVar>> threadVars = threadVarHashMap.entrySet();
+//		for (Entry<String, ThreadVar> entry : threadVars) {
+//			System.out.println("______________________________THREAD_VAR_HASHMAP____________________________________");
+//			System.out.println("KEY: "+entry.getKey());
+//			System.out.println(entry.getValue());
+//			System.out.println("______________________________THREAD_VAR_HASHMAP____________________________________");
+//		}
+//		
+//		//打印线程触发节点
+//		for (ThreadTriggerNode threadTiggerNode : threadTriggerNodes) {
+//			System.out.println("_____________________________TRIGGER_TRIGGER_NODE___________________________________");
+//			System.out.println(threadTiggerNode);
+//			System.out.println("_____________________________TRIGGER_TRIGGER_NODE___________________________________");
+//		}
 		
 		ArrayList<Edge> edgesList = new ArrayList<>();
 		for (ThreadTriggerNode threadTiggerNode : threadTriggerNodes) {
@@ -103,6 +127,8 @@ public class CASTParser {
 			System.out.println(edge);
 			System.out.println("______________________________________TRIGGER_______________________________________");
 		}
+		
+
 	}
 	
 	public void synchronizeParser(ArrayList<CompileUnit> compileUnits) {
@@ -116,7 +142,35 @@ public class CASTParser {
 		for (ThreadWaitNode threadWaitNode : threadWaitNodes) {
 			System.out.println(threadWaitNode);
 		}
+		ArrayList<Edge> edges = new ArrayList<>();
+		for (ThreadNotifyNode threadNotifyNode : threadNotifyNodes) {
+			for (ThreadWaitNode threadWaitNode : threadWaitNodes) {
+				//属于同一个类中
+				if(threadNotifyNode.getFileName().equals(threadWaitNode.getFileName())){
+					if (threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())) {
+						Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
+						Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
+						Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
+						edges.add(edge);
+					}
+				}
+				else if(threadRelate.contains(threadNotifyNode.getClassName()+threadWaitNode.getClassName())) {
+					if (threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())) {
+						Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
+						Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
+						Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
+						edges.add(edge);
+					}
+				}
+			}
+		}
+		for (Edge edge : edges) {
+			System.out.println("______________________________________SYND_______________________________________");
+			System.out.println(edge);
+			System.out.println("______________________________________SYND_______________________________________");
+		}
 	}
+	
 	public void  printFiles() {
 		for (String fileName : filePathList) {
 			System.out.println(fileName);

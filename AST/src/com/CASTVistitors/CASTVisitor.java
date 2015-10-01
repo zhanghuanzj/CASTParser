@@ -139,6 +139,9 @@ public class CASTVisitor extends ASTVisitor {
 			break;
 		}
 		threadInformation.setStartLineNumber(lineNumber);
+		if (node.resolveBinding()==null) {
+			return;
+		}
 		String key = node.resolveBinding().getQualifiedName().toString();
 		threadsInfoHashMap.put(key, threadInformation);
 	}
@@ -243,7 +246,10 @@ public class CASTVisitor extends ASTVisitor {
 	public boolean visit(AnonymousClassDeclaration node) {
 		System.out.println("AnonymousClass_______________________________________________________");
 		ITypeBinding typeBinding = node.resolveBinding();
-		String number = node.resolveBinding().getBinaryName();
+		if (typeBinding==null) {
+			return false;
+		}
+		String number = typeBinding.getBinaryName();
 		
 		if (typeBinding.getSuperclass()!=null) {
 			String supClass = typeBinding.getSuperclass().getName();
@@ -284,10 +290,12 @@ public class CASTVisitor extends ASTVisitor {
 		System.out.println("ClassInstanceCreation.................................................");
 		ASTNode root = node.getRoot();
 		ASTNode nextNode = node.getParent();
-		String bindingTypeName = node.getType().toString();
-		String threadInfoKey = node.resolveTypeBinding().getQualifiedName();
-		if (threadInfoKey.equals("")) {
-			threadInfoKey = node.resolveTypeBinding().getBinaryName();
+		if (node.resolveTypeBinding()==null) {
+			return false;
+		}
+		String bindingTypeName = node.resolveTypeBinding().getQualifiedName();
+		if (bindingTypeName!=null&&bindingTypeName.equals("")) {
+			bindingTypeName = node.resolveTypeBinding().getBinaryName();
 		}
 //		System.out.println(instanceNumber++);
 //		System.out.println(filePath);
@@ -305,7 +313,7 @@ public class CASTVisitor extends ASTVisitor {
 					int lineNumber = compilationUnit.getLineNumber(astNode.getStartPosition());
 					String varName = ((VariableDeclarationFragment) pNode).getName().toString();
 					String typeName = objectClassType.getName();
-					ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, threadInfoKey);
+					ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, bindingTypeName);
 					threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
 				}
 				break;
@@ -319,12 +327,18 @@ public class CASTVisitor extends ASTVisitor {
 					Expression expression = ((Assignment)pNode).getLeftHandSide();
 					if (expression instanceof SimpleName) {
 						SimpleName simpleName = (SimpleName)((Assignment)pNode).getLeftHandSide();
+						if (simpleName.resolveTypeBinding()==null) {
+							return false;
+						}
 						ASTNode astNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding());
+						if (astNode==null) {
+							return false;
+						}
 						int lineNumber = compilationUnit.getLineNumber(astNode.getStartPosition());
 //						System.out.println("DeclareNumber :"+lineNumber);
 						String varName = ((Assignment)pNode).getLeftHandSide().toString();
 						String typeName = objectClassType.getName();
-						ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, threadInfoKey);
+						ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, bindingTypeName);
 						threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
 					}	
 				}
@@ -339,7 +353,7 @@ public class CASTVisitor extends ASTVisitor {
 					String typeName = node.getType().toString();
 					String varName = node.resolveTypeBinding().getBinaryName();
 					int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-					ThreadVar threadVar = new ThreadVar(typeName, filePath, varName, typeName, threadInfoKey);
+					ThreadVar threadVar = new ThreadVar(typeName, filePath, varName, bindingTypeName, bindingTypeName);
 					threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
 				}
 	
@@ -349,6 +363,7 @@ public class CASTVisitor extends ASTVisitor {
 		return super.visit(node);
 	}
 	
+	//记录触发节点信息
 	@Override
 	public boolean visit(MethodInvocation node) {
 		System.out.println("MethodInvocation.................................................");
@@ -378,14 +393,6 @@ public class CASTVisitor extends ASTVisitor {
 		return super.visit(node);		
 	}	
 	
-	
-	@Override
-	public boolean visit(MethodDeclaration node) {
-		System.out.println("File:"+filePath);
-		System.out.println("Entrance1:"+compilationUnit.getLineNumber(node.getName().getStartPosition()));
-		System.out.println("Entrance2:"+compilationUnit.getLineNumber(node.getStartPosition()));
-		return super.visit(node);
-	}
 	
 
 
