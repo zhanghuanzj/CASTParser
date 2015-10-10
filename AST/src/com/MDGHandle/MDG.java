@@ -20,6 +20,8 @@ public class MDG {
 		cAstParser = new CASTParser(projectPath);
 	}
 	public void handleAst() {
+		Node e = new Node("jack", 12);
+		nodeList.add(e);
 		System.out.println("Handling AST information");
 		cAstParser.parser();
 	}

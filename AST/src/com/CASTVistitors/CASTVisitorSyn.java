@@ -56,6 +56,7 @@ public class CASTVisitorSyn extends ASTVisitor {
 	//获取唤醒节点以及阻塞节点的信息
 	@Override
 	public boolean visit(MethodInvocation node) {
+		System.out.println("22222222222222222");
 		String methodName = node.getName().toString();
 		//行号
 		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());

@@ -5,7 +5,8 @@ public enum ThreadType {
 	RUNNABLE("RUNNABLE"),
 	CALLABLE("CALLABLE"),
 	RECURSIVETASK("RECURSIVETASK"),
-	RECURSIVEACTION("RECURSIVEACTION");
+	RECURSIVEACTION("RECURSIVEACTION"),
+	MAIN("MAIN");
 	private String type;
 	public String getType() {
 		return type;

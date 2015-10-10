@@ -40,14 +40,14 @@ import com.MDGHandle.Nodes.ThreadNotifyNode;
 import com.MDGHandle.Nodes.ThreadWaitNode;
 import com.MDGHandle.Nodes.WaitType;
 
-public class CASTVisitorPrepare extends ASTVisitor {
+public class CASTVisitorJavaMethodsPrepare extends ASTVisitor {
 	private CompilationUnit compilationUnit ;
 	private String filePath;
 	private static int methodNum = 0;
 
 	private HashMap<String, MethodInformation> changeMethods;
 
-	public CASTVisitorPrepare() {
+	public CASTVisitorJavaMethodsPrepare() {
 		super();
 		changeMethods = new HashMap<>();
 	}
@@ -102,9 +102,7 @@ public class CASTVisitorPrepare extends ASTVisitor {
 		} 
 		MethodDeclaration methodDeclaration = (MethodDeclaration)pNode;
 		//如果是构造函数则不算在内
-		System.out.println(filePath);
-		System.out.println(compilationUnit.getLineNumber(methodDeclaration.getStartPosition()));
-		if (methodDeclaration.isConstructor()) {
+		if (methodDeclaration.resolveBinding().isConstructor()) {
 			return null;
 		}
 		StringBuilder methodName = new StringBuilder(methodDeclaration.getName().toString());                                   //函数名
@@ -302,6 +300,7 @@ public class CASTVisitorPrepare extends ASTVisitor {
 				String key = methodKey(node);
 				methodRegisterOfParameters(key, index);
 			}
+			
 		}
 		else if (prefixExpression.getOperand() instanceof FieldAccess) {
 			FieldAccess fieldAccess = (FieldAccess) prefixExpression.getOperand();
@@ -496,8 +495,6 @@ public class CASTVisitorPrepare extends ASTVisitor {
 		return super.visit(node);
 	}
 	
-
-
 	
 	public HashMap<String, MethodInformation> getChangeMethods() {
 		return changeMethods;

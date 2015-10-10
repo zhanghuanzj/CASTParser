@@ -10,6 +10,8 @@ import org.eclipse.jdt.core.dom.ASTParser;
 
 
 public class CASTCreater {
+	static int i=1;
+	
 	private String projectPath;
 	private ArrayList<String> srcFilePathList;
 	private ArrayList<String> binFilePathList;
@@ -55,6 +57,7 @@ public class CASTCreater {
 	}
 	
 	public void getFilePaths() {
+		
 		File directory = new File(projectPath);
 		ArrayList<File> directoryFiles = new ArrayList<>();
 		directoryFiles.add(directory);
@@ -68,8 +71,9 @@ public class CASTCreater {
 			for (File file : files) {
 				if (file.isDirectory()) {
 					directoryFiles.add(file);
+					i++;
 				}
-				else if(file.getPath().contains(".java")){
+				else if(file.getPath().endsWith(".java")){
 					System.out.println(file.getPath());
 					srcFilePathList.add(file.getAbsolutePath());
 				}
@@ -79,6 +83,7 @@ public class CASTCreater {
 				}
 			}
 		}
+		System.out.println("Directory number is :"+i);
 	}
 	
 }

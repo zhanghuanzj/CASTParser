@@ -49,7 +49,7 @@ import com.MDGHandle.Nodes.ThreadNotifyNode;
 import com.MDGHandle.Nodes.ThreadWaitNode;
 import com.MDGHandle.Nodes.WaitType;
 
-public class CASTVisitorCheck extends ASTVisitor {
+public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 	private CompilationUnit compilationUnit ;
 	private String filePath;
 	private boolean isMethodInfoChange = false;                 //用于记录是否有函数信息修改
@@ -57,46 +57,8 @@ public class CASTVisitorCheck extends ASTVisitor {
 	private HashMap<String, MethodInformation> javaMethodsInfo; //java源码函数修改信息
 	private HashMap<String, Integer> javaMethodsMapTable;       //java源码函数映射表 
 
-	{
-		File file = new File("javaMethodsInfo\\javaMethodInfo.obj");
-		File file2 = new File("javaMethodsInfo\\javaMethodMapTable.obj");
-		FileInputStream fileInputStream;
-		FileInputStream fileInputStream2;
-		try {
-			fileInputStream = new FileInputStream(file);
-			fileInputStream2 = new FileInputStream(file2);
-			try {
-				ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
-				ObjectInputStream objectInputStream2 = new ObjectInputStream(fileInputStream2);
-				try {
-					javaMethodsInfo = (HashMap<String, MethodInformation>) objectInputStream.readObject();
-					javaMethodsMapTable = (HashMap<String, Integer>) objectInputStream2.readObject();
-					objectInputStream.close();
-					objectInputStream2.close();
-					
-					PrintWriter pWriter = new PrintWriter("justTest.txt");
-					Set<Map.Entry<String, MethodInformation>> set = javaMethodsInfo.entrySet();
-					for (Entry<String, MethodInformation> entry : set) {
-						pWriter.println(entry.getKey());
-						pWriter.print(entry.getValue());
-					}
-					pWriter.flush();
-					pWriter.close();
-					
-					System.out.println("The javaMethodsInfo size is :"+javaMethodsInfo.size());
-					System.out.println("The javaMethodsMapTable size is :"+javaMethodsMapTable.size());
-				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public CASTVisitorCheck(HashMap<String, MethodInformation> changeMethods) {
+
+	public CASTVisitorJavaMethodsCheck(HashMap<String, MethodInformation> changeMethods) {
 		super();
 		this.changeMethods = changeMethods;
 	}
@@ -120,7 +82,7 @@ public class CASTVisitorCheck extends ASTVisitor {
 		}
 		return -1;
 	}
-	// KEY 的确定,调用函数所在的函数信息
+	// KEY 的确定
 	public String methodKey(ASTNode node) {	
 		//获取所在         < 函数名+参数列表>   （为了区分重载情况）
 		ASTNode pNode = node.getParent() ;
@@ -132,7 +94,7 @@ public class CASTVisitorCheck extends ASTVisitor {
 		} 
 		MethodDeclaration methodDeclaration = (MethodDeclaration)pNode;
 		//如果是构造函数则不算在内
-		if (methodDeclaration.isConstructor()) {
+		if (methodDeclaration.resolveBinding().isConstructor()) {
 			return null;
 		}
 		StringBuilder methodName = new StringBuilder(methodDeclaration.getName().toString());   //函数名                             
@@ -387,9 +349,6 @@ public class CASTVisitorCheck extends ASTVisitor {
 		if (astNode instanceof MethodInvocation) {
 			MethodInvocation node = (MethodInvocation)astNode;
 			String key = methodKey(node);
-			System.out.println("The methodInvoke in the method:"+key);
-			System.out.println("File is:"+filePath);
-			System.out.println("Line Number:"+compilationUnit.getLineNumber(node.getStartPosition()));
 			boolean isChange = false;
 			if (index==-1||key==null) {
 				return ;
@@ -430,14 +389,6 @@ public class CASTVisitorCheck extends ASTVisitor {
 		}		
 	}
 
-	//如果函数键值为javaMethodTable中的键值，则转换为java函数相关的KEY
-	public String switchToJavaMethodKey(String key) {
-		String strKey = key.substring(0, key.indexOf('_'));
-		if (javaMethodsMapTable.containsKey(strKey)) {
-			return javaMethodsMapTable.get(strKey)+key.substring(key.indexOf('_'));
-		}
-		return null;
-	}
 	@Override
 	public boolean visit(MethodInvocation node) {
 		String key = getMethodKey(node);
@@ -446,42 +397,33 @@ public class CASTVisitorCheck extends ASTVisitor {
 		if (key==null) {
 			return super.visit(node);
 		}
-		System.out.println("MethodName is:"+node.getName());
-		String javaKey = switchToJavaMethodKey(key);    //获取java函数的key
-		System.out.println("Java key is:"+javaKey);
 		//所调用函数会改变值
 		MethodInformation methodInformation;
 		if (changeMethods.containsKey(key)) {             //属于工程函数    
 			methodInformation = changeMethods.get(key);
-		}
-		else if (javaMethodsInfo.containsKey(javaKey)) {  //属于java类库函数
-			methodInformation = javaMethodsInfo.get(javaKey);
-			System.out.println("The javaKey:"+javaKey);
-		}
-		else {
-			return super.visit(node);
-		}
-		//会改变调用对象的值
-		if (methodInformation.isObjChange()) {
-			//对象为成员变量
-			int result = memberVar(node.getExpression());
-			changeHandle(result, node);
-		}
-		//会改变参数对象的值
-		if (methodInformation.getIsParaChange()>0) {
-			int parameters = methodInformation.getIsParaChange();
-			//获取参数列表
-			List<?> paraList = node.arguments();
-			int i = 0;
-			while(parameters>0){
-				if ((parameters&1)==1) {   //index为i的参数发生了改变
-					int x = parameterVar(paraList.get(i));
-					changeHandle(x, node);
-				}
-				i++;
-				parameters = parameters>>1;
+			//会改变调用对象的值
+			if (methodInformation.isObjChange()) {
+				//对象为成员变量
+				int result = memberVar(node.getExpression());
+				changeHandle(result, node);
 			}
-		}	
+			//会改变参数对象的值
+			if (methodInformation.getIsParaChange()>0) {
+				int parameters = methodInformation.getIsParaChange();
+				//获取参数列表
+				List<?> paraList = node.arguments();
+				int i = 0;
+				while(parameters>0){
+					if ((parameters&1)==1) {   //index为i的参数发生了改变
+						int x = parameterVar(paraList.get(i));
+						changeHandle(x, node);
+					}
+					i++;
+					parameters = parameters>>1;
+				}
+			}	
+		}
+		
 		return super.visit(node);
 	}
 
@@ -493,41 +435,31 @@ public class CASTVisitorCheck extends ASTVisitor {
 		if (key==null) {
 			return super.visit(node);
 		}
-		System.out.println(node.getName());
-		String javaKey = switchToJavaMethodKey(key);    //获取java函数的key
-		System.out.println("Java key is:"+javaKey);
 		//所调用函数会改变值
 		MethodInformation methodInformation;
 		if (changeMethods.containsKey(key)) {             //属于工程函数    
 			methodInformation = changeMethods.get(key);
-		}
-		else if (javaMethodsInfo.containsKey(javaKey)) {  //属于java类库函数
-			methodInformation = javaMethodsInfo.get(javaKey);
-		}
-		else {
-			return super.visit(node);
-		}
-		//所调用函数会改变值
-		//会改变调用对象的值isObjChange == true;
-		if (methodInformation.isObjChange()) {
-			//对象为成员变量,super.fun
-			changeHandle(-2, node);
-		}
-		//会改变参数对象的值isParaChange>0;
-		if (methodInformation.getIsParaChange()>0) {
-			int parameters = methodInformation.getIsParaChange();
-			//获取参数列表
-			List<?> paraList = node.arguments();
-			int i = 0;
-			while(parameters>0){
-				if ((parameters&1)==1) {   //index为i的参数发生了改变
-					int x = parameterVar(paraList.get(i));
-					changeHandle(x, node);
-				}
-				i++;
-				parameters = parameters>>1;
+			//会改变调用对象的值isObjChange == true;
+			if (methodInformation.isObjChange()) {
+				//对象为成员变量,super.fun
+				changeHandle(-2, node);
 			}
-		}
+			//会改变参数对象的值isParaChange>0;
+			if (methodInformation.getIsParaChange()>0) {
+				int parameters = methodInformation.getIsParaChange();
+				//获取参数列表
+				List<?> paraList = node.arguments();
+				int i = 0;
+				while(parameters>0){
+					if ((parameters&1)==1) {   //index为i的参数发生了改变
+						int x = parameterVar(paraList.get(i));
+						changeHandle(x, node);
+					}
+					i++;
+					parameters = parameters>>1;
+				}
+			}
+		}	
 		return super.visit(node);
 	}
 	
