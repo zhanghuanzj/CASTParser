@@ -149,7 +149,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 				methodInformation.setObjChange(true);
 				isMethodInfoChange = true;
 				System.out.println("__________________The member variable change!_____________________");
-				System.out.println(this.filePath);
 				return true;
 			}
 			
@@ -160,7 +159,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 			isMethodInfoChange = true;
 			changeMethods.put(key, methodInformation);
 			System.out.println("__________________The member variable change!_____________________");
-			System.out.println(this.filePath);
 			return true;
 		}
 		return false;
@@ -177,7 +175,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 				methodInformation.parameterChange(index);          //改变第index 参数的修改情况
 				isMethodInfoChange = true;
 				System.out.println("_______________The parameter change , index is:"+index+"__________");
-				System.out.println(this.filePath);	
 				return true;
 			}         
 		}
@@ -187,7 +184,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 			isMethodInfoChange = true;
 			changeMethods.put(key, methodInformation);
 			System.out.println("_______________The parameter change , index is:"+index+"__________");
-			System.out.println(this.filePath);
 			return true;
 		}
 		return false;
@@ -392,7 +388,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 	@Override
 	public boolean visit(MethodInvocation node) {
 		String key = getMethodKey(node);
-		System.out.println("The key is:"+key);
 		//key 获取失败
 		if (key==null) {
 			return super.visit(node);
@@ -430,7 +425,6 @@ public class CASTVisitorJavaMethodsCheck extends ASTVisitor {
 	@Override
 	public boolean visit(SuperMethodInvocation node) {
 		String key = getMethodKey(node);
-		System.out.println("The key is"+key);
 		//key 获取失败
 		if (key==null) {
 			return super.visit(node);

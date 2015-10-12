@@ -29,6 +29,7 @@ import com.CASTVistitors.CASTVisitorJavaMethodsPrepare;
 import com.CASTVistitors.CASTVisitorSyn;
 import com.CASTVistitors.CASTVisitorPrepare;
 import com.Information.MethodInformation;
+import com.Information.ShareVarInfo;
 import com.Information.ThreadInformation;
 import com.Information.ThreadVar;
 import com.MDGHandle.Edges.Edge;
@@ -43,6 +44,12 @@ public class CASTParser {
 	private ArrayList<String> filePathList;
 	private HashMap<String, ThreadInformation> threadsInfo;
 	private HashMap<String, ThreadVar> threadVarHashMap;
+	/*
+	 * 用于记录线程运行中包含的函数调用
+	 * KEY:methodKey <包_类_函数_参数>
+	 * VALUE:线程信息key <包_类> BinaryName
+	 */
+	private HashMap<String, String> threadMethodMapTable; 
 	private Set<String> threadRelate;
 	private ArrayList<ThreadTriggerNode> threadTriggerNodes;
 	//构造函数
@@ -52,6 +59,7 @@ public class CASTParser {
 		threadsInfo = new HashMap<>();	
 		threadVarHashMap = new HashMap<>();
 		threadTriggerNodes = new ArrayList<>();
+		threadMethodMapTable = new HashMap<>();
 		threadRelate = new HashSet<>();
 	}
 
@@ -67,10 +75,11 @@ public class CASTParser {
 		
 		
 		
-//		triggerParser(compileUnits);
+		triggerParser(compileUnits);
 //		bindThreadRel();	
 //		synchronizeParser(compileUnits);	
-//		communicationParserPre(compileUnits);
+		communicationParserPre(compileUnits);
+		System.out.println("FIRST FINISH");
 		communicatinoParserPost(compileUnits);
 //		javaSrcMethod(compileUnits);
 		
@@ -79,7 +88,7 @@ public class CASTParser {
 	//线程启动边解析
 	public void triggerParser(ArrayList<CompileUnit> compileUnits) {
 		//用于获取线程相关类的信息，线程变量集，线程启动点
-		CASTVisitorTrigger castVisitor = new CASTVisitorTrigger(threadsInfo,threadVarHashMap,threadTriggerNodes);
+		CASTVisitorTrigger castVisitor = new CASTVisitorTrigger(threadsInfo,threadVarHashMap,threadTriggerNodes,threadMethodMapTable);
 		castVisitor.traverse(compileUnits);
 		//打印线程类信息
 		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
@@ -276,9 +285,34 @@ public class CASTParser {
 	}
 	//线程通信依赖解析--Def与Use
 	public void communicatinoParserPost(ArrayList<CompileUnit> compileUnits) {
-		CASTVisitorCommunication castVisitorCommunication = new CASTVisitorCommunication();
+		CASTVisitorCommunication castVisitorCommunication = new CASTVisitorCommunication(threadMethodMapTable,threadsInfo);
 		castVisitorCommunication.traverse(compileUnits);
+//		Set<Map.Entry<String, ThreadInformation>> set = threadsInfo.entrySet();
+//		for (Entry<String, ThreadInformation> entry : set) {
+//			System.out.println("KEY:"+entry.getKey());
+//			System.out.println("VALUE:"+entry.getValue());
+//		}
+		System.out.println(threadsInfo.size());
+//		System.out.println(threadMethodMapTable);
+		System.out.println(threadMethodMapTable.size());
+		
+//		Set<Map.Entry<String, String>> set = threadMethodMapTable.entrySet();
+//		for (Entry<String, String> entry : set) {
+//			System.out.println("KEY:"+entry.getKey());
+//			System.out.println("VALUE:"+entry.getValue());
+//		}
+		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
+		for (Entry<String, ThreadInformation> entry : threadInfomations) {
+			System.out.println(entry.getKey());
+			HashMap<String, ShareVarInfo> vars = entry.getValue().getDefList();
+			Set<Map.Entry<String, ShareVarInfo>> var = vars.entrySet();
+			for (Entry<String, ShareVarInfo> entry2 : var) {
+				System.out.println("KEY: "+entry2.getKey());
+				System.out.println(entry2.getValue());
+			}
+		}
 		System.out.println("DONE!");
+		System.out.flush();
 	}
 	//java源码函数解析
 	public void javaSrcMethod(ArrayList<CompileUnit> compileUnits) {

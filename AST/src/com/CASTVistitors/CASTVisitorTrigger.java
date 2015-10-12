@@ -32,6 +32,7 @@ import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.internal.compiler.lookup.VariableBinding;
 import org.eclipse.osgi.internal.loader.buddy.SystemPolicy;
 
+import com.CASTHelper.CASTHelper;
 import com.CASTParser.CompileUnit;
 import com.Information.ThreadInformation;
 import com.Information.ThreadType;
@@ -43,21 +44,31 @@ public class CASTVisitorTrigger extends ASTVisitor {
 	private HashMap<String, ThreadInformation> threadsInfoHashMap;
 	private HashMap<String, ThreadVar> threadVarHashMap;
 	private ArrayList<ThreadTriggerNode> threadTriggerNodes;
+	/*
+	 * 用于记录线程运行中包含的函数调用
+	 * KEY:methodKey <包_类_函数_参数>
+	 * VALUE:线程信息key <包_类> BinaryName
+	 */
+	private HashMap<String, String> threadMethodMapTable;
 	private String filePath;
 	static int instanceNumber = 1;
+	static int methodNum = 1;
 	public CASTVisitorTrigger(HashMap<String, ThreadInformation> threadsInfoHashMap,
-					   HashMap<String, ThreadVar> threadVarHashMap,
-					   ArrayList<ThreadTriggerNode> threadTiggerNodes) {	
+							  HashMap<String, ThreadVar> threadVarHashMap,
+							  ArrayList<ThreadTriggerNode> threadTiggerNodes,
+							  HashMap<String, String> threadMethodMapTable) {	
 		this.threadsInfoHashMap = threadsInfoHashMap;
 		this.threadVarHashMap = threadVarHashMap;
 		this.threadTriggerNodes = threadTiggerNodes;
+		this.threadMethodMapTable = threadMethodMapTable;
 	}
 	//Acquire the Thread entrance lineNumber
 	private int getThreadEntrance(TypeDeclaration node) {
 		for (MethodDeclaration methodDec : node.getMethods()) {
 			String methodName = methodDec.getName().toString();
-			if (methodName.equals("run")||methodName.equals("call")||methodName.equals("compute")) {
-				return compilationUnit.getLineNumber(methodDec.getName().getStartPosition());		
+			if (methodName.equals("run")||methodName.equals("call")||methodName.equals("compute")) {	
+				threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), node.resolveBinding().getBinaryName());
+				return compilationUnit.getLineNumber(methodDec.getName().getStartPosition());
 			}
 		}
 		return 0;
@@ -71,6 +82,7 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				MethodDeclaration methodDec = (MethodDeclaration)object;
 				String methodName = methodDec.getName().toString();
 				if (methodName.equals("run")||methodName.equals("call")||methodName.equals("compute")) {
+					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), node.resolveBinding().getBinaryName());
 					return compilationUnit.getLineNumber(methodDec.getName().getStartPosition());
 				}
 			}
@@ -142,7 +154,7 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		if (node.resolveBinding()==null) {
 			return;
 		}
-		String key = node.resolveBinding().getQualifiedName().toString();
+		String key = node.resolveBinding().getBinaryName().toString();
 		threadsInfoHashMap.put(key, threadInformation);
 	}
 	//Collect the information about the thread related anonymousclass
@@ -293,10 +305,8 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		if (node.resolveTypeBinding()==null) {
 			return false;
 		}
-		String bindingTypeName = node.resolveTypeBinding().getQualifiedName();
-		if (bindingTypeName!=null&&bindingTypeName.equals("")) {
-			bindingTypeName = node.resolveTypeBinding().getBinaryName();
-		}
+		String bindingTypeName = node.resolveTypeBinding().getBinaryName();
+
 //		System.out.println(instanceNumber++);
 //		System.out.println(filePath);
 //		System.out.println("Binding Class: "+node.getType());
@@ -366,7 +376,6 @@ public class CASTVisitorTrigger extends ASTVisitor {
 	//记录触发节点信息
 	@Override
 	public boolean visit(MethodInvocation node) {
-		System.out.println("111111111111111111111111111111111111111111111111111111111111");
 //		System.out.println("MethodInvocation.................................................");
 		String methodName = node.getName().toString();
 		if (methodName.equals("start")) {
@@ -402,14 +411,12 @@ public class CASTVisitorTrigger extends ASTVisitor {
 			for(astNode  = node.getParent();astNode!=compilationUnit;astNode = astNode.getParent()){
 				if (astNode instanceof TypeDeclaration) {
 					TypeDeclaration typeDeclaration = (TypeDeclaration) astNode;
-					String key = typeDeclaration.resolveBinding().getQualifiedName();
-					if (key == "") {
-						key = typeDeclaration.resolveBinding().getBinaryName();
-					}
+					String key = typeDeclaration.resolveBinding().getBinaryName()+"_MAIN";
 					ThreadInformation threadInformation = new ThreadInformation(typeDeclaration.getName().toString(), ThreadType.MAIN);
 					threadInformation.setFilePath(filePath);
 					threadInformation.setStartLineNumber(compilationUnit.getLineNumber(node.getName().getStartPosition()));
 					threadsInfoHashMap.put(key, threadInformation);
+					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(node), key);
 				}
 			}
 		}

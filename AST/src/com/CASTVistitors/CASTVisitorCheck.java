@@ -441,14 +441,12 @@ public class CASTVisitorCheck extends ASTVisitor {
 	@Override
 	public boolean visit(MethodInvocation node) {
 		String key = getMethodKey(node);
-		System.out.println("The key is:"+key);
+//		System.out.println("The key is:"+key);
 		//key 获取失败
 		if (key==null) {
 			return super.visit(node);
 		}
-		System.out.println("MethodName is:"+node.getName());
 		String javaKey = switchToJavaMethodKey(key);    //获取java函数的key
-		System.out.println("Java key is:"+javaKey);
 		//所调用函数会改变值
 		MethodInformation methodInformation;
 		if (changeMethods.containsKey(key)) {             //属于工程函数    
@@ -456,7 +454,6 @@ public class CASTVisitorCheck extends ASTVisitor {
 		}
 		else if (javaMethodsInfo.containsKey(javaKey)) {  //属于java类库函数
 			methodInformation = javaMethodsInfo.get(javaKey);
-			System.out.println("The javaKey:"+javaKey);
 		}
 		else {
 			return super.visit(node);
@@ -488,14 +485,12 @@ public class CASTVisitorCheck extends ASTVisitor {
 	@Override
 	public boolean visit(SuperMethodInvocation node) {
 		String key = getMethodKey(node);
-		System.out.println("The key is"+key);
 		//key 获取失败
 		if (key==null) {
 			return super.visit(node);
 		}
 		System.out.println(node.getName());
 		String javaKey = switchToJavaMethodKey(key);    //获取java函数的key
-		System.out.println("Java key is:"+javaKey);
 		//所调用函数会改变值
 		MethodInformation methodInformation;
 		if (changeMethods.containsKey(key)) {             //属于工程函数    

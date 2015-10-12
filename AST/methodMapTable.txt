@@ -6,6 +6,8 @@ com.concurrent
 1
 com.concurrent02
 2
+com.communication
+6
 com.synchronize
 0
 com.barrier
