@@ -2,6 +2,7 @@ package com.CASTHelper;
 
 import java.util.List;
 
+import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
 import org.eclipse.jdt.core.dom.ArrayAccess;
@@ -118,27 +119,25 @@ public class CASTHelper {
 	public ASTNode getKeyVarName(ASTNode astNode) {
 		//1.SimpleName__var
 		if (astNode instanceof SimpleName) {                            
-			SimpleName simpleName = (SimpleName) astNode;
-			return simpleName;
+			return astNode;
 		}
 		//2.QualifiedName__obj.var
 		else if(astNode instanceof QualifiedName) {                      
 			QualifiedName qualifiedName = (QualifiedName) astNode;
 			//找到最外面的那个对象xx.x.i中的xx
-			while(qualifiedName.getQualifier() instanceof QualifiedName){
-				qualifiedName = (QualifiedName)qualifiedName.getQualifier();
+			if(!(qualifiedName.getQualifier() instanceof SimpleName)){
+				return getKeyVarName(qualifiedName.getQualifier());
 			}
-			return (SimpleName)qualifiedName.getQualifier();
+			return qualifiedName.getQualifier();
 		}
 		//3.FieldAccess__this.var
 		else if (astNode instanceof FieldAccess) {
 			FieldAccess fieldAccess = (FieldAccess) astNode;
 			//this.a.b找到最外面的那个对象
-			while(fieldAccess.getExpression() instanceof FieldAccess){
-				fieldAccess = (FieldAccess) fieldAccess.getExpression();
+			if (!(fieldAccess.getExpression() instanceof SimpleName)) {
+				return getKeyVarName(fieldAccess.getExpression());
 			}
-			SimpleName simpleName = (SimpleName) fieldAccess.getName();
-			return simpleName;
+			return fieldAccess.getName();
 		}
 		//4.SuperFieldAccess__super.var
 		else if (astNode instanceof SuperFieldAccess) {
@@ -209,8 +208,8 @@ public class CASTHelper {
 		return className.substring(0, dotPosition)+"_"+className.substring(dotPosition+1)+"_"+methodName;
 	}
 	
-	//获取调用函数的key
-	public String getMethodKey(ASTNode astNode) {
+	//获取调用函数的key,astNode为MethodInvocaton或者SuperMethodInvocation
+	public String getInvokeMethodKey(ASTNode astNode) {
 		if (astNode instanceof MethodInvocation) {
 			MethodInvocation node = (MethodInvocation)astNode;
 			if (node.resolveMethodBinding()!=null) {
@@ -280,6 +279,53 @@ public class CASTHelper {
 					}	
 				}
 				return position;
+			}
+		}
+		return -1;
+	}
+	/*
+	 * 返回simpleName所在函数调用的位置(-1出错，-2为对象，0~n为index)
+	 * simpleName:要查询的变量名节点
+	 * methodInvoke:变量所在的函数调用节点
+	 */
+	public int getIndexInMethodInvoke(SimpleName simpleName,ASTNode methodInvoke) {
+		if (methodInvoke instanceof MethodInvocation) {
+			MethodInvocation methodInvocation = (MethodInvocation)methodInvoke;
+			ASTNode astNode = methodInvocation.getExpression();
+			if (astNode!=null) {
+				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				//若为调用函数的对象则返回-2
+				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
+					System.out.println("对象调用函数");
+					return -2;
+				}
+			}
+			List<?> argumetns = methodInvocation.arguments();
+			int index = 0;
+			//逐一考察参数列表中的参数
+			for (Object object : argumetns) {
+				astNode = (ASTNode)object;
+				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
+					System.out.println("INDEX: "+index);
+					return index;
+				}
+				index++;
+			}
+		}
+		else if (methodInvoke instanceof SuperMethodInvocation) {
+			SuperMethodInvocation superMethodInvocation = (SuperMethodInvocation)methodInvoke;
+			List<?> arguments = superMethodInvocation.arguments();
+			int index = 0;
+			ASTNode astNode;
+			for (Object object : arguments) {
+				astNode = (ASTNode)object;
+				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
+					System.out.println("INDEX: "+index);
+					return index;
+				}
+				index++;
 			}
 		}
 		return -1;

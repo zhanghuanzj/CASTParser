@@ -76,7 +76,7 @@ public class CASTParser {
 		
 		
 		triggerParser(compileUnits);
-//		bindThreadRel();	
+		bindThreadRel();	
 //		synchronizeParser(compileUnits);	
 		communicationParserPre(compileUnits);
 		System.out.println("FIRST FINISH");
@@ -286,7 +286,10 @@ public class CASTParser {
 	//线程通信依赖解析--Def与Use
 	public void communicatinoParserPost(ArrayList<CompileUnit> compileUnits) {
 		CASTVisitorCommunication castVisitorCommunication = new CASTVisitorCommunication(threadMethodMapTable,threadsInfo);
-		castVisitorCommunication.traverse(compileUnits);
+		do {
+			castVisitorCommunication.traverse(compileUnits);
+		} while (castVisitorCommunication.isUpdate());
+		
 //		Set<Map.Entry<String, ThreadInformation>> set = threadsInfo.entrySet();
 //		for (Entry<String, ThreadInformation> entry : set) {
 //			System.out.println("KEY:"+entry.getKey());
@@ -303,12 +306,26 @@ public class CASTParser {
 //		}
 		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
 		for (Entry<String, ThreadInformation> entry : threadInfomations) {
-			System.out.println(entry.getKey());
-			HashMap<String, ShareVarInfo> vars = entry.getValue().getDefList();
-			Set<Map.Entry<String, ShareVarInfo>> var = vars.entrySet();
-			for (Entry<String, ShareVarInfo> entry2 : var) {
-				System.out.println("KEY: "+entry2.getKey());
-				System.out.println(entry2.getValue());
+			System.out.println("< Thread: "+entry.getKey()+" >");
+			System.out.println("_________________________DEF________________________________");
+			HashMap<String, ShareVarInfo> defHM = entry.getValue().getDefList();
+			Set<Map.Entry<String, ShareVarInfo>> defs = defHM.entrySet();
+			if (defs.isEmpty()) {
+				System.out.println("------------------------EMPTY--------------------------");
+			}
+			for (Entry<String, ShareVarInfo> def : defs) {
+				System.out.println("KEY: "+def.getKey());
+				System.out.println(def.getValue());
+			}
+			System.out.println("_________________________USE________________________________");
+			HashMap<String, ShareVarInfo> usesHM = entry.getValue().getUseList();
+			Set<Map.Entry<String, ShareVarInfo>> uses = usesHM.entrySet();
+			if (uses.isEmpty()) {
+				System.out.println("------------------------EMPTY--------------------------");
+			}
+			for (Entry<String, ShareVarInfo> use : uses) {
+				System.out.println("KEY: "+use.getKey());
+				System.out.println(use.getValue());
 			}
 		}
 		System.out.println("DONE!");

@@ -1,8 +1,2 @@
-com.other
-3com.signal
-4com.concurrent
-1com.concurrent02
-2com.communication
-6com.synchronize
-0com.barrier
-5
+com.barrier
+0

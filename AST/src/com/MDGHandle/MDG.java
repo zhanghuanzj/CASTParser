@@ -27,7 +27,7 @@ public class MDG {
 	}
 	public static void main(String[] args) {
 		System.out.println("Begin parser");
-		MDG mdg = new MDG("H:\\Projects\\Concurrent");
+		MDG mdg = new MDG("H:\\Projects\\Concurrent\\src\\com\\barrier");
 		mdg.handleAst();
 		System.out.println("finish");
 	}
