@@ -8,6 +8,7 @@ import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,7 +58,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	 * KEY:methodKey <包_类_函数_参数>
 	 * VALUE:线程信息key <包_类> BinaryName
 	 */
-	private HashMap<String, String> threadMethodMapTable;     		//用于记录线程运行中包含的函数调用
+	private HashMap<String, HashSet<String>> threadMethodMapTable;     		//用于记录线程运行中包含的函数调用
 	private HashMap<String, ThreadInformation> threadInfo;			//线程信息表，用于记录def，use
 	private CASTHelper castHelper;
 	private static int accessNum = 1;
@@ -124,7 +125,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	}
 	
 
-	public CASTVisitorCommunication(HashMap<String, String> threadMethodMapTable,
+	public CASTVisitorCommunication(HashMap<String, HashSet<String>> threadMethodMapTable,
 									HashMap<String, ThreadInformation> threadInfo) {
 		super();
 		this.threadMethodMapTable = threadMethodMapTable;
@@ -240,7 +241,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		return false;
 	}
 	//对相关变量的def，use判断(use:false,def:true)
-	public boolean isDefinExpression(SimpleName node,DeclarePosition declarePosition,String threadKey) {
+	public boolean isDefinExpression(SimpleName node) {
 		for(ASTNode pNode = node;pNode!=compilationUnit;pNode=pNode.getParent()){
 			//1.前缀表达式
 			if (pNode instanceof PrefixExpression) {
@@ -279,12 +280,6 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			else if (pNode instanceof MethodInvocation) {
 				System.out.println("MethodInvocation:"+node);
 				String methodKey = castHelper.getInvokeMethodKey(pNode);
-				//调用函数为工程中的函数,且还未加入线程函数表
-				if (!threadMethodMapTable.containsKey(methodKey)&&
-					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
-					threadMethodMapTable.put(methodKey, threadKey);
-					isUpdate = true;
-				}
 				//获取调用函数信息
 				MethodInformation methodInfo = getMethodInformation(methodKey);
 				//函数信息不在会改变值的函数表中，则表明该函数不会改变对象或参数的值，所以将变量归为USE集，返回false
@@ -304,12 +299,6 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			}
 			else if (pNode instanceof SuperMethodInvocation) {
 				String methodKey = castHelper.getInvokeMethodKey(pNode);
-				//调用函数为工程中的函数,且还未加入线程函数表
-				if (!threadMethodMapTable.containsKey(methodKey)&&
-					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
-					threadMethodMapTable.put(methodKey, threadKey);
-					isUpdate = true;
-				}
 				//获取调用函数信息
 				MethodInformation methodInfo = getMethodInformation(methodKey);
 				//函数信息不在会改变值的函数表中，则表明该函数不会改变对象或参数的值，所以将变量归为USE集，返回false
@@ -329,6 +318,53 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		}
 		return false;
 	}
+	//函数调用记录处理
+	public void methodRecord(SimpleName node,String threadKey) {
+		ASTNode pNode = node.getParent();
+		while(pNode!=compilationUnit){
+			if (pNode instanceof MethodInvocation) {
+				String methodKey = castHelper.getInvokeMethodKey(pNode);
+				//调用函数为工程中的函数,且还未加入线程函数表
+				if (!threadMethodMapTable.containsKey(methodKey)&&
+					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					HashSet<String> threadSet = new HashSet<>();
+					threadSet.add(threadKey);
+					threadMethodMapTable.put(methodKey, threadSet);
+					isUpdate = true;
+				}
+				//调用函数为工程中的函数,且已经加入线程函数表
+				else if (threadMethodMapTable.containsKey(methodKey)&&
+						sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					//还未将与函数相关的线程加入hashset
+					if (!threadMethodMapTable.get(methodKey).contains(threadKey)) {
+						threadMethodMapTable.get(methodKey).add(threadKey);
+						isUpdate = true;
+					}
+				}
+			}
+			else if (pNode instanceof SuperMethodInvocation) {
+				String methodKey = castHelper.getInvokeMethodKey(pNode);
+				//调用函数为工程中的函数,且还未加入线程函数表
+				if (!threadMethodMapTable.containsKey(methodKey)&&
+					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					HashSet<String> threadSet = new HashSet<>();
+					threadSet.add(threadKey);
+					threadMethodMapTable.put(methodKey, threadSet);
+					isUpdate = true;
+				}
+				//调用函数为工程中的函数,且已经加入线程函数表
+				else if (threadMethodMapTable.containsKey(methodKey)&&
+						sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					//还未将与函数相关的线程加入hashset
+					if (!threadMethodMapTable.get(methodKey).contains(threadKey)) {
+						threadMethodMapTable.get(methodKey).add(threadKey);
+						isUpdate = true;
+					}
+				}
+			}
+			pNode = pNode.getParent();
+		}
+	}
 	@Override
 	public boolean visit(SimpleName node) {
 		//确保simpleName 在线程相关的函数内(run,main及其调用的函数)
@@ -336,61 +372,77 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		if (!threadMethodMapTable.containsKey(methodKey)) {
 			return super.visit(node);
 		}
-		String threadKey = threadMethodMapTable.get(methodKey);
-		//获取simpleName全名 a-->var.a.c
-		ASTNode astNode = castHelper.getVarName(node);
-		//从全名中获取核心 var.a.c 中的var
-		SimpleName astNode2 = (SimpleName) castHelper.getKeyVarName(astNode);
-//		System.out.println("源变量名："+node.getIdentifier());
-//		System.out.println("真变量名："+astNode2.getIdentifier());
-		if (!node.getIdentifier().equals(astNode2.getIdentifier())) {
-			System.out.println("不相同");
-			return super.visit(node);
-		}
-		//获取定义的位置
-		DeclarePosition declarePosition = castHelper.isDeclaredInCurrentMethod(astNode2);
-		/* 1.局部变量
-		 * 2.java源码变量名（println）
-		 * 3.参数列表中的simpleName
-		 *   不作为所需变量处理
-		 */
-		if (declarePosition==DeclarePosition.INMETHOD||
-		   (declarePosition==DeclarePosition.INPARAMETER&&isParaSimpleName(astNode2))) {
-			return super.visit(node);
-		}
-		//参数变量但引用重置则不做处理
-		if (declarePosition==DeclarePosition.INPARAMETER) {   
-			ASTNode decNode = castHelper.getDecNode(node);
-			MethodInformation decNodeMethodInfo = getMethodInformation(castHelper.methodKey(decNode));
-			if (decNodeMethodInfo!=null) {
-				int postition = castHelper.getParaIndex(node);
-				if (postition!=-1&&!decNodeMethodInfo.isCheckTableOk(postition)) {
-					return super.visit(node);
+		HashSet<String> threadKeys = threadMethodMapTable.get(methodKey);
+		for (String threadKey : threadKeys) {
+			//函数调用记录
+			methodRecord(node, threadKey);
+			//获取simpleName全名 a-->var.a.c
+			ASTNode astNode = castHelper.getVarName(node);
+			//从全名中获取核心 var.a.c 中的var
+			SimpleName astNode2 = (SimpleName) castHelper.getKeyVarName(astNode);
+
+			
+//			System.out.println("源变量名："+node.getIdentifier());
+//			System.out.println("真变量名："+astNode);
+			if (!node.getIdentifier().equals(astNode2.getIdentifier())) {
+				System.out.println("不相同");
+				return super.visit(node);
+			}
+			//获取定义的位置
+			DeclarePosition declarePosition = castHelper.varDeclaredPosition(astNode2);
+			/* 1.局部变量
+			 * 2.java源码变量名（println）
+			 * 3.参数列表中的simpleName
+			 *   不作为所需变量处理
+			 */
+			if (declarePosition==DeclarePosition.INMETHOD||
+			   (declarePosition==DeclarePosition.INPARAMETER&&isParaSimpleName(astNode2))) {
+				return super.visit(node);
+			}
+			//参数变量但引用重置则不做处理
+			if (declarePosition==DeclarePosition.INPARAMETER) {   
+				ASTNode decNode = castHelper.getDecNode(node);
+				MethodInformation decNodeMethodInfo = getMethodInformation(castHelper.methodKey(decNode));
+				if (decNodeMethodInfo!=null) {
+					int postition = castHelper.getParaIndex(node);
+					if (postition!=-1&&!decNodeMethodInfo.isCheckTableOk(postition)) {
+						return super.visit(node);
+					}
 				}
 			}
-		}
-		//判断是属于Def集还是Use集
-		boolean isDefVar ;
-		isDefVar = isDefinExpression(astNode2, declarePosition,threadKey);
-		System.out.println("Beg____________________________________________________");
-		System.out.println(filePath);
-		System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
-		System.out.println("Type_Name :"+node.resolveTypeBinding().getQualifiedName());
-		System.out.println(declarePosition);
-		System.out.println("is def: "+isDefVar);
-		System.out.println("simpleName:"+astNode2);
-		System.out.println("End____________________________________________________");
-		//信息提取<(包+类_行号_变量名),(行号、类型、路径)>
-		ThreadInformation threadInformation = threadInfo.get(threadMethodMapTable.get(methodKey));
-		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-		String varType = node.resolveTypeBinding().getQualifiedName();
-		ShareVarInfo shareVarInfo = new ShareVarInfo(lineNumber, varType, filePath);
-		if (isDefVar) {	
-			threadInformation.addDefVar(threadMethodMapTable.get(methodKey)+"_"+lineNumber+"_"+node.getIdentifier(), shareVarInfo);
-		}
-		else {
-			threadInformation.addUseVar(threadMethodMapTable.get(methodKey)+"_"+lineNumber+"_"+node.getIdentifier(), shareVarInfo);
-		}
+			//判断是属于Def集还是Use集
+			boolean isDefVar ;
+			isDefVar = isDefinExpression(astNode2);
+			System.out.println("Beg____________________________________________________");
+			System.out.println(filePath);
+			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
+			System.out.println("Type_Name :"+node.resolveTypeBinding().getQualifiedName());
+			System.out.println(declarePosition);
+			System.out.println("is def: "+isDefVar);
+			System.out.println("simpleName:"+astNode2);
+			System.out.println("End____________________________________________________");
+			//信息提取<(包+类_行号_变量名),(行号、类型、路径)>
+			ThreadInformation threadInformation = threadInfo.get(threadKey);
+			int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
+			String varType = node.resolveTypeBinding().getQualifiedName();
+			ShareVarInfo shareVarInfo = new ShareVarInfo(lineNumber, varType, filePath,methodKey);
+			//成员原始变量
+			if (declarePosition==DeclarePosition.INMEMBERPRIMITIVE) {
+				ASTNode decNode = castHelper.getDecNode(node);
+				shareVarInfo.setPrimitive(true);
+				shareVarInfo.setClassLineNumber(compilationUnit.getLineNumber(decNode.getStartPosition()));
+				if (decNode instanceof VariableDeclarationFragment) {
+					VariableDeclarationFragment varDecFragment = (VariableDeclarationFragment)decNode;
+					shareVarInfo.setBelongClass(varDecFragment.resolveBinding().getDeclaringClass().getBinaryName());
+				}
+			}
+			if (isDefVar) {	
+				threadInformation.addDefVar(threadKey+"_"+lineNumber+"_"+node.getIdentifier(), shareVarInfo);
+			}
+			else {
+				threadInformation.addUseVar(threadKey+"_"+lineNumber+"_"+node.getIdentifier(), shareVarInfo);
+			}
+		}	
 		return super.visit(node);	
 	}
 

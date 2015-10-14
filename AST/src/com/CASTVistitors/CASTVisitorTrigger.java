@@ -3,6 +3,7 @@ package com.CASTVistitors;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,16 +48,16 @@ public class CASTVisitorTrigger extends ASTVisitor {
 	/*
 	 * 用于记录线程运行中包含的函数调用
 	 * KEY:methodKey <包_类_函数_参数>
-	 * VALUE:线程信息key <包_类> BinaryName
+	 * VALUE:线程key集   <包_类> BinaryName
 	 */
-	private HashMap<String, String> threadMethodMapTable;
+	private HashMap<String, HashSet<String>> threadMethodMapTable;
 	private String filePath;
 	static int instanceNumber = 1;
 	static int methodNum = 1;
 	public CASTVisitorTrigger(HashMap<String, ThreadInformation> threadsInfoHashMap,
 							  HashMap<String, ThreadVar> threadVarHashMap,
 							  ArrayList<ThreadTriggerNode> threadTiggerNodes,
-							  HashMap<String, String> threadMethodMapTable) {	
+							  HashMap<String, HashSet<String>> threadMethodMapTable) {	
 		this.threadsInfoHashMap = threadsInfoHashMap;
 		this.threadVarHashMap = threadVarHashMap;
 		this.threadTriggerNodes = threadTiggerNodes;
@@ -67,7 +68,9 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		for (MethodDeclaration methodDec : node.getMethods()) {
 			String methodName = methodDec.getName().toString();
 			if (methodName.equals("run")||methodName.equals("call")||methodName.equals("compute")) {	
-				threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), node.resolveBinding().getBinaryName());
+				HashSet<String> set = new HashSet<>();
+				set.add(node.resolveBinding().getBinaryName());
+				threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), set);
 				return compilationUnit.getLineNumber(methodDec.getName().getStartPosition());
 			}
 		}
@@ -82,7 +85,9 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				MethodDeclaration methodDec = (MethodDeclaration)object;
 				String methodName = methodDec.getName().toString();
 				if (methodName.equals("run")||methodName.equals("call")||methodName.equals("compute")) {
-					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), node.resolveBinding().getBinaryName());
+					HashSet<String> set = new HashSet<>();
+					set.add(node.resolveBinding().getBinaryName());
+					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(methodDec), set);
 					return compilationUnit.getLineNumber(methodDec.getName().getStartPosition());
 				}
 			}
@@ -416,7 +421,9 @@ public class CASTVisitorTrigger extends ASTVisitor {
 					threadInformation.setFilePath(filePath);
 					threadInformation.setStartLineNumber(compilationUnit.getLineNumber(node.getName().getStartPosition()));
 					threadsInfoHashMap.put(key, threadInformation);
-					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(node), key);
+					HashSet<String> set = new HashSet<>();
+					set.add(key);
+					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(node), set);
 				}
 			}
 		}

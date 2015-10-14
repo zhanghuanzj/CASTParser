@@ -15,6 +15,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import javax.swing.text.StyledEditorKit.ForegroundAction;
+
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -47,9 +50,9 @@ public class CASTParser {
 	/*
 	 * 用于记录线程运行中包含的函数调用
 	 * KEY:methodKey <包_类_函数_参数>
-	 * VALUE:线程信息key <包_类> BinaryName
+	 * VALUE:线程key集   <包_类> BinaryName
 	 */
-	private HashMap<String, String> threadMethodMapTable; 
+	private HashMap<String, HashSet<String>> threadMethodMapTable; 
 	private Set<String> threadRelate;
 	private ArrayList<ThreadTriggerNode> threadTriggerNodes;
 	//构造函数
@@ -327,6 +330,11 @@ public class CASTParser {
 				System.out.println("KEY: "+use.getKey());
 				System.out.println(use.getValue());
 			}
+		}
+		Set<Map.Entry<String, HashSet<String>>> methodSet = threadMethodMapTable.entrySet();
+		for (Entry<String, HashSet<String>> entry : methodSet) {
+			System.out.println(entry.getKey());
+			System.out.println(entry.getValue());
 		}
 		System.out.println("DONE!");
 		System.out.flush();

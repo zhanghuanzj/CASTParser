@@ -1,2 +1,2 @@
-com.barrier
+com.methodShare
 0

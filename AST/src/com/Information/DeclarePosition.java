@@ -3,6 +3,7 @@ package com.Information;
 public enum DeclarePosition {
 	INMEMBER(0),
 	INPARAMETER(1),
+	INMEMBERPRIMITIVE(2),
 	INMETHOD(-1);
 	private int type;
 

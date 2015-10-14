@@ -1,5 +1,7 @@
 package com.CASTHelper;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import org.eclipse.jdt.core.dom.AST;
@@ -13,78 +15,148 @@ import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.Initializer;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Modifier;
+import org.eclipse.jdt.core.dom.PrimitiveType;
 import org.eclipse.jdt.core.dom.QualifiedName;
 import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.SuperFieldAccess;
 import org.eclipse.jdt.core.dom.SuperMethodInvocation;
+import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
+import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
+import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 
 import com.Information.DeclarePosition;
 
 public class CASTHelper {
+	HashSet<String> varType = new HashSet<>();
+	double []a;
 	private final static CASTHelper CAST_HELPER = new CASTHelper();
+	private String jdfj;
 	private CASTHelper() {	
-		
+		varType.add("String");
+		varType.add("Short");
+		varType.add("Long");
+		varType.add("Integer");
+		varType.add("Float");
+		varType.add("Double");
+		varType.add("Character");
+		varType.add("Byte");
+		varType.add("Boolean");
 	}
 	public static CASTHelper getInstance() {
 		return CAST_HELPER;
 	}
-	//查看变量是否为函数内部的局部变量
-	public DeclarePosition varDeclaredInCurrentMethod(ASTNode decNode) {
-		//(1)成员变量
+	/**变量声明位置的处理
+	 * 
+	 * @param decNode：变量声明节点
+	 * @return 变量定义的位置
+	 */
+	public DeclarePosition varDeclaredPositionHandle(ASTNode decNode) {
+		//1.成员变量
 		if (decNode instanceof VariableDeclarationFragment) {   
-			if (decNode.getParent() instanceof FieldDeclaration) {  
+			//(1).普通成员变量
+			if (decNode.getParent() instanceof FieldDeclaration) { 
+				boolean isFinal = false;
+				FieldDeclaration fieldDeclaration = (FieldDeclaration)decNode.getParent();
+				List<?> list = fieldDeclaration.modifiers();
+				for (Object object : list) {
+					Modifier modifier = (Modifier)object;
+					if (modifier.isFinal()) {
+						isFinal = true;
+					}
+				}
+				//不可改类型或原始变量为final
+				if (varType.contains(fieldDeclaration.getType().resolveBinding().getName())||
+					(fieldDeclaration.getType().isPrimitiveType()&&isFinal)	) {
+					return DeclarePosition.INMETHOD;
+				}
+				if (fieldDeclaration.getType().isPrimitiveType()) {
+					return DeclarePosition.INMEMBERPRIMITIVE;
+				}
+				return DeclarePosition.INMEMBER;
+			}
+			//(2)在main函数内部
+			else if (methodKey(decNode)!=null&&methodKey(decNode).endsWith("main_S")) {
+				if (decNode.getParent() instanceof VariableDeclarationStatement) {  // int a = 3;
+					VariableDeclarationStatement variableDeclarationStatement = (VariableDeclarationStatement)decNode.getParent();
+					if (variableDeclarationStatement.getType().isPrimitiveType()||
+						varType.contains(variableDeclarationStatement.getType().resolveBinding().getName())) {
+						return DeclarePosition.INMETHOD;
+					}
+				}
+				else if(decNode.getParent() instanceof VariableDeclarationExpression){//for(int a=3;...)
+					VariableDeclarationExpression variableDeclarationExpression = (VariableDeclarationExpression)decNode.getParent();
+					if (variableDeclarationExpression.getType().isPrimitiveType()||
+						varType.contains(variableDeclarationExpression.getType().resolveBinding().getName())) {
+						return DeclarePosition.INMETHOD;
+					}
+				}
 				return DeclarePosition.INMEMBER;
 			}
 		}
-		//(2)参数变量
+		//2.参数变量
 		else if (decNode instanceof SingleVariableDeclaration&&decNode.getParent() instanceof MethodDeclaration) {  
+			SingleVariableDeclaration singleVariableDeclaration = (SingleVariableDeclaration)decNode;
+			if (singleVariableDeclaration.getType().isPrimitiveType()||
+				varType.contains(singleVariableDeclaration.getType().resolveBinding().getName())) {
+				return DeclarePosition.INMETHOD;
+			}
 			return DeclarePosition.INPARAMETER;
 		}
 		//不是成员变量和参数变量，或者java源码中的变量（null找不到）则归为INMETHOD，不做处理
 		return DeclarePosition.INMETHOD;
 	}
-	//查看ASTNode中的变量是否为函数内部的局部变量
-	public DeclarePosition isDeclaredInCurrentMethod(ASTNode astNode) {
+	/**查看ASTNode中变量的声明位置
+	 * 
+	 * @param astNode 变量名
+	 * @return 声明位置
+	 */
+	public DeclarePosition varDeclaredPosition(ASTNode astNode) {
 		CompilationUnit compilationUnit = (CompilationUnit) astNode.getRoot();
 		//1.SimpleName__var
 		if (astNode instanceof SimpleName) {                            
 			SimpleName simpleName = (SimpleName) astNode;
 			ASTNode decNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding());
-			return varDeclaredInCurrentMethod(decNode);
+			//声明语句中的变量，不做处理
+			if (astNode.getParent() == decNode) {
+				return DeclarePosition.INMETHOD;
+			}
+			return varDeclaredPositionHandle(decNode);
 		}
 		//2.QualifiedName__obj.var
 		else if(astNode instanceof QualifiedName) {                      
 			QualifiedName qualifiedName = (QualifiedName) astNode;
 			//找到最外面的那个对象xx.x.i中的xx
-			while(qualifiedName.getQualifier() instanceof QualifiedName){
-				qualifiedName = (QualifiedName)qualifiedName.getQualifier();
+			if(!(qualifiedName.getQualifier() instanceof SimpleName)){
+				return varDeclaredPosition(qualifiedName.getQualifier());
 			}
 			ASTNode decNode = compilationUnit.findDeclaringNode(qualifiedName.getQualifier().resolveBinding());
-			return varDeclaredInCurrentMethod(decNode);
+			return varDeclaredPositionHandle(decNode);
 		}
 		//3.FieldAccess__this.var
 		else if (astNode instanceof FieldAccess) {
 			FieldAccess fieldAccess = (FieldAccess) astNode;
 			//this.a.b找到最外面的那个对象
-			while(fieldAccess.getExpression() instanceof FieldAccess){
-				fieldAccess = (FieldAccess) fieldAccess.getExpression();
+			if (!(fieldAccess.getExpression() instanceof SimpleName)) {
+				return varDeclaredPosition(fieldAccess.getExpression());
 			}
 			SimpleName simpleName = (SimpleName) fieldAccess.getName();
 			ASTNode decNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding());
-			return varDeclaredInCurrentMethod(decNode);
+			return varDeclaredPositionHandle(decNode);
 		}
 		//4.ArrayAccess__a[20]
 		else if (astNode instanceof ArrayAccess	) {
 			ArrayAccess access = (ArrayAccess) astNode;
-			return isDeclaredInCurrentMethod(access.getArray());
+			return varDeclaredPosition(access.getArray());
 		}
 		//5.SuperFieldAccess__super.var
 		else if (astNode instanceof SuperFieldAccess) {
 			SuperFieldAccess superFieldAccess = (SuperFieldAccess) astNode;
-			return isDeclaredInCurrentMethod(superFieldAccess.getName());
+			return varDeclaredPosition(superFieldAccess.getName());
 		}
 		return DeclarePosition.INMETHOD;
 	}
@@ -134,7 +206,7 @@ public class CASTHelper {
 		else if (astNode instanceof FieldAccess) {
 			FieldAccess fieldAccess = (FieldAccess) astNode;
 			//this.a.b找到最外面的那个对象
-			if (!(fieldAccess.getExpression() instanceof SimpleName)) {
+			if (!(fieldAccess.getExpression() instanceof ThisExpression)) {
 				return getKeyVarName(fieldAccess.getExpression());
 			}
 			return fieldAccess.getName();
@@ -283,7 +355,7 @@ public class CASTHelper {
 		}
 		return -1;
 	}
-	/*
+	/**
 	 * 返回simpleName所在函数调用的位置(-1出错，-2为对象，0~n为index)
 	 * simpleName:要查询的变量名节点
 	 * methodInvoke:变量所在的函数调用节点
