@@ -68,6 +68,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	private HashMap<String, MethodInformation> javaMethodsInfo; 	//java源码函数信息
 	private HashMap<String, Integer> sourceMethodsMapTable;     	//工程包名映射表
 	private HashMap<String, Integer> javaMethodsMapTable;       	//java包名映射表
+	private Set<String> synMethodSet;
 
 	{
 		File file = new File("javaMethodsInfo\\javaMethodInfo.obj");
@@ -122,6 +123,24 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
+		
+		synMethodSet = new HashSet<>();
+		synMethodSet.add("wait");
+		synMethodSet.add("await");
+		synMethodSet.add("notify");
+		synMethodSet.add("notifyAll");
+		synMethodSet.add("signal");
+		synMethodSet.add("signalAll");
+		synMethodSet.add("lock");
+		synMethodSet.add("unlock");
+		synMethodSet.add("acquire");
+		synMethodSet.add("release");
+		synMethodSet.add("join");
+		synMethodSet.add("execute");
+		synMethodSet.add("invoke");
+		synMethodSet.add("invokeAll");
+		synMethodSet.add("invokeAny");
+		synMethodSet.add("submit");
 	}
 	
 
@@ -395,6 +414,14 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			 * 3.参数列表中的simpleName
 			 *   不作为所需变量处理
 			 */
+			if (node.getParent() instanceof MethodInvocation&&declarePosition!=DeclarePosition.INPARAMETER) {
+				MethodInvocation methodInvocation = (MethodInvocation)node.getParent();
+				if(synMethodSet.contains(methodInvocation.getName().toString())) {
+					System.out.println("同步函数，不做处理！");
+					return super.visit(node);
+				}
+			}
+
 			if (declarePosition==DeclarePosition.INMETHOD||
 			   (declarePosition==DeclarePosition.INPARAMETER&&isParaSimpleName(astNode2))) {
 				return super.visit(node);

@@ -31,6 +31,7 @@ import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.internal.compiler.lookup.VariableBinding;
+import org.eclipse.osgi.internal.container.Capabilities;
 import org.eclipse.osgi.internal.loader.buddy.SystemPolicy;
 
 import com.CASTHelper.CASTHelper;
@@ -102,35 +103,39 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		if (node.getSuperclass()!=null) {
 			String supClass = node.getSuperclass().getName();
 			//正则表达式匹配,用于匹配RecursiveTask<T>
-			String mre ="RecursiveTask<.*>";
-		    Pattern p = Pattern.compile(mre);
-		    Matcher m = p.matcher(supClass);	
-			if (supClass.equals("Thread")) { 
-//				System.out.println("Thread");
-				return true;
-			}
-			else if(supClass.equals("RecursiveAction")) {
-//				System.out.println("RecursiveAction");
-				return true;
-			}
-			else if(m.find()) {
-//				System.out.println("RecursiveTask");
+			String rTask ="RecursiveTask<.*>";
+		    Pattern recursiveTaskPattern = Pattern.compile(rTask);
+		    Matcher rMatcher = recursiveTaskPattern.matcher(supClass);
+		    //正则表达式匹配,用于匹配FutureTask<T>
+		    String futureTask = "FutureTask<.*>";
+		    Pattern futureTaskPattern = Pattern.compile(futureTask);
+		    Matcher fmMatcher = futureTaskPattern.matcher(supClass);
+			if (supClass.equals("Thread")||supClass.equals("RecursiveAction")||rMatcher.find()||fmMatcher.find()) { 
 				return true;
 			}
 		}
 		ITypeBinding[] interfaces = node.getInterfaces();
 		if (interfaces.length>0) {
 			ArrayList<String> interfaceNames = new ArrayList<>();
+			//正则表达式匹配，Callable<T>
+			String callableMatch = "Callable<.*>";
+			Pattern callablePattern = Pattern.compile(callableMatch);
+			//正则表达式匹配，Future<T>
+			String futureMatch = "Future<T>";
+			Pattern futurePattern = Pattern.compile(futureMatch);
+			//正则表达式匹配，RunnableFuture<T>
+			String rFutureMatch = "RunnableFuture<T>";
+			Pattern rFuturePattern = Pattern.compile(rFutureMatch);
 			for(int i=0;i<interfaces.length;i++){
 				interfaceNames.add(interfaces[i].getName());			
 			}
-			if (interfaceNames.contains("Runnable")) {
-//				System.out.println(node.getName()+" is implement Runnable");
-				return true;
-			}
-			else if (interfaceNames.contains("Callable")) {
-//				System.out.println(node.getName()+" is implement Callable");
-				return true;
+			for (String interfaceName : interfaceNames) {
+				Matcher cMatcher = callablePattern.matcher(interfaceName);
+				Matcher fMatcher = futurePattern.matcher(interfaceName);
+				Matcher rMatcher = rFuturePattern.matcher(interfaceName);
+				if (interfaceName.equals("Runnable")||cMatcher.find()||fMatcher.find()||rMatcher.find()) {
+					return true;
+				}
 			}
 		}
 		return false;
@@ -189,6 +194,9 @@ public class CASTVisitorTrigger extends ASTVisitor {
 	private void acquireTriggerInfo(ASTNode astNode,MethodInvocation node) {
 		if(astNode instanceof SimpleName) {    //Thread对象的函数调用object.start()
 			SimpleName simpleName = (SimpleName) astNode;
+			String matcher = "FutureTask<.*>";
+			Pattern futureTaskPattern = Pattern.compile(matcher);
+			Matcher fMatcher = futureTaskPattern.matcher(simpleName.resolveTypeBinding().getName());
 			if (isThreadRelate(simpleName.resolveTypeBinding())) { //确保调用对象线程相关		
 				ASTNode decAstNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding()); 
 //				System.out.println("DecLineNumber: "+compilationUnit.getLineNumber(decAstNode.getStartPosition()));
@@ -201,7 +209,17 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
 				threadTriggerNodes.add(threadTiggerNode);
 			}
+			else if (fMatcher.find()) {
+				ASTNode decAstNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding()); 
+				int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
+				int decLineNumber = compilationUnit.getLineNumber(decAstNode.getStartPosition());
+				String typeName = simpleName.resolveTypeBinding().getName();
+				String varName = simpleName.getIdentifier().toString();
+				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
+				threadTriggerNodes.add(threadTiggerNode);
+			}
 		}
+
 		else if(astNode instanceof ClassInstanceCreation){  //匿名类的调用new Thread(){}.start()
 			ClassInstanceCreation classInstanceCreation = (ClassInstanceCreation) astNode;
 			if (isThreadRelate(classInstanceCreation.getType().resolveBinding())) { ////确保调用对象线程相关	
@@ -245,14 +263,19 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		else if(!node.superInterfaceTypes().isEmpty()){
 			List<?> list = node.superInterfaceTypes();
 			List<String> newList = new ArrayList<>();
+			String callableMatch = "Callable<.*>";
+			Pattern callablePattern = Pattern.compile(callableMatch);
 			for (Object ele : list) {
 				newList.add(ele.toString());
 			}
-			if (newList.contains("Runnable")) {
-				threadHandle(node, ThreadType.RUNNABLE, name);
-			}
-			else if (newList.contains("Callable")) {
-				threadHandle(node, ThreadType.CALLABLE, name);
+			for (String interfaceName : newList) {
+				Matcher callableMacher = callablePattern.matcher(interfaceName);
+				if (interfaceName.equals("Runnable")) {
+					threadHandle(node, ThreadType.RUNNABLE, name);
+				}
+				else if (callableMacher.find()) {
+					threadHandle(node, ThreadType.CALLABLE, name);
+				}
 			}
 			return false;
 		}
@@ -299,7 +322,45 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		}
 		return super.visit(node);
 	}
-	/*(实例创建)用于记录线程变量的动态绑定类型
+	/**获取线程相关变量绑定的线程类型名
+	 * 
+	 * @param node : 实例创建节点
+	 * @return     : 绑定线程的类型名
+	 */
+	public String getBindingTypeName(ClassInstanceCreation node) {
+		List<?> argvs = node.arguments();
+		//参数列表为空则获取类型信息
+		if (argvs.isEmpty()) {
+			ITypeBinding typeBinding = node.resolveTypeBinding();
+			if (typeBinding!=null&&isThreadRelate(typeBinding)) {
+				return typeBinding.getBinaryName();
+			}
+		}
+		//参数列表不为空
+		else {
+			//参数为实例创建
+			if (argvs.get(0) instanceof ClassInstanceCreation) {
+				return getBindingTypeName((ClassInstanceCreation)argvs.get(0));
+			}
+			//普通变量名
+			else if(argvs.get(0) instanceof SimpleName)	{
+				SimpleName simpleName = (SimpleName)argvs.get(0);
+				if (simpleName.resolveBinding()!=null) {
+					IVariableBinding variableBinding = (IVariableBinding)simpleName.resolveBinding();
+					ASTNode decNode = compilationUnit.findDeclaringNode(variableBinding);
+					int lineNumber = compilationUnit.getLineNumber(decNode.getStartPosition());
+					String varKey = filePath+"_"+lineNumber+"_"+variableBinding.getType().getName()+"_"+variableBinding.getName();
+					System.out.println("VARKEY:"+varKey);
+					if (threadVarHashMap.containsKey(varKey)) {
+						return threadVarHashMap.get(varKey).getThreadInfoKey();
+					}
+				}
+			}
+		}
+		return null;
+	}
+	
+	/**(实例创建)用于记录线程变量的动态绑定类型
 	 *变量存储的HashMap，KEY：文件路径+行号+变量类型+变量名
 	 */
 	@Override
@@ -310,29 +371,35 @@ public class CASTVisitorTrigger extends ASTVisitor {
 		if (node.resolveTypeBinding()==null) {
 			return false;
 		}
-		String bindingTypeName = node.resolveTypeBinding().getBinaryName();
+		String bindingTypeName = getBindingTypeName(node);
 
-//		System.out.println(instanceNumber++);
-//		System.out.println(filePath);
-//		System.out.println("Binding Class: "+node.getType());
-//		System.out.println("ThreadInfoKey: "+threadInfoKey);
+/*		System.out.println(instanceNumber++);
+		System.out.println(filePath);
+		System.out.println("Binding Class: "+node.getType());
+		System.out.println("ThreadInfoKey: "+threadInfoKey);*/
 
 		for(ASTNode pNode=nextNode;pNode!=root;nextNode = pNode,pNode=nextNode.getParent()){
-			if (pNode instanceof VariableDeclarationFragment) {
-//				System.out.println("VariableName  : "+((VariableDeclarationFragment) pNode).getName());
-//				System.out.println("TypeName: "+((VariableDeclarationFragment) pNode).resolveBinding().getType().getName());
-				ITypeBinding objectClassType = ((VariableDeclarationFragment) pNode).resolveBinding().getType();
+			//1.Thread a = new Thread();
+			if (pNode instanceof VariableDeclarationFragment) {   
+				VariableDeclarationFragment varDecFragment = (VariableDeclarationFragment)pNode;
+				ITypeBinding objectClassType = varDecFragment.resolveBinding().getType();
+				
+				//变量信息获取
+			    ASTNode astNode = compilationUnit.findDeclaringNode(varDecFragment.resolveBinding());
+				int lineNumber = compilationUnit.getLineNumber(astNode.getStartPosition());
+				String varName = varDecFragment.getName().toString();  //变量名
+				String typeName = objectClassType.getName();           //类型
 				if (isThreadRelate(objectClassType)) {
-					System.out.println("It's Thread Related");
-				    ASTNode astNode = compilationUnit.findDeclaringNode(((VariableDeclarationFragment) pNode).resolveBinding());
-					int lineNumber = compilationUnit.getLineNumber(astNode.getStartPosition());
-					String varName = ((VariableDeclarationFragment) pNode).getName().toString();
-					String typeName = objectClassType.getName();
+					//线程变量的创建与存储
 					ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, bindingTypeName);
+					if (threadVarHashMap.containsKey(filePath+"_"+lineNumber+"_"+typeName+"_"+varName)) {
+						return super.visit(node);
+					}
 					threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
 				}
 				break;
 			}
+			//2. a = new Thread();
 			else if(pNode instanceof Assignment) {
 //				System.out.println("VariableName as  : "+((Assignment)pNode).getLeftHandSide());
 				ITypeBinding objectClassType = ((Assignment)pNode).resolveTypeBinding();
@@ -354,11 +421,15 @@ public class CASTVisitorTrigger extends ASTVisitor {
 						String varName = ((Assignment)pNode).getLeftHandSide().toString();
 						String typeName = objectClassType.getName();
 						ThreadVar threadVar = new ThreadVar(typeName,filePath, varName, bindingTypeName, bindingTypeName);
+						if (threadVarHashMap.containsKey(filePath+"_"+lineNumber+"_"+typeName+"_"+varName)) {
+							return super.visit(node);
+						}
 						threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
 					}	
 				}
 			}
-			else if(pNode instanceof MethodInvocation){   //new Thread(){}.start()
+			//3.new Thread(){}.start()
+			else if(pNode instanceof MethodInvocation){   
 				ITypeBinding iTypeBinding = node.getType().resolveBinding();
 				if (isThreadRelate(iTypeBinding)) {
 //					System.out.println("Anonymous Threa class create and invoke");
@@ -369,9 +440,11 @@ public class CASTVisitorTrigger extends ASTVisitor {
 					String varName = node.resolveTypeBinding().getBinaryName();
 					int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
 					ThreadVar threadVar = new ThreadVar(typeName, filePath, varName, bindingTypeName, bindingTypeName);
+					if (threadVarHashMap.containsKey(filePath+"_"+lineNumber+"_"+typeName+"_"+varName)) {
+						return super.visit(node);
+					}
 					threadVarHashMap.put(filePath+"_"+lineNumber+"_"+typeName+"_"+varName, threadVar);
-				}
-	
+				}	
 			}
 		}
 //		System.out.println("______________________________________________________________");
@@ -418,12 +491,18 @@ public class CASTVisitorTrigger extends ASTVisitor {
 					TypeDeclaration typeDeclaration = (TypeDeclaration) astNode;
 					String key = typeDeclaration.resolveBinding().getBinaryName()+"_MAIN";
 					ThreadInformation threadInformation = new ThreadInformation(typeDeclaration.getName().toString(), ThreadType.MAIN);
+					int lineNumber = compilationUnit.getLineNumber(node.getName().getStartPosition());
 					threadInformation.setFilePath(filePath);
-					threadInformation.setStartLineNumber(compilationUnit.getLineNumber(node.getName().getStartPosition()));
+					threadInformation.setStartLineNumber(lineNumber);
+					//线程信息表
 					threadsInfoHashMap.put(key, threadInformation);
 					HashSet<String> set = new HashSet<>();
 					set.add(key);
+					//线程调用函数表
 					threadMethodMapTable.put(CASTHelper.getInstance().methodKey(node), set);
+					//线程变量信息存储
+					ThreadVar threadVar = new ThreadVar("Main", filePath, "main", key, key);
+					threadVarHashMap.put(filePath+"_"+lineNumber+"_"+"Main"+"_"+"main", threadVar);
 				}
 			}
 		}

@@ -30,6 +30,7 @@ import com.CASTVistitors.CASTVisitorCommunication;
 import com.CASTVistitors.CASTVisitorJavaMethodsCheck;
 import com.CASTVistitors.CASTVisitorJavaMethodsPrepare;
 import com.CASTVistitors.CASTVisitorSyn;
+import com.CASTVistitors.CASTVisitorTEST;
 import com.CASTVistitors.CASTVisitorPrepare;
 import com.Information.MethodInformation;
 import com.Information.ShareVarInfo;
@@ -77,13 +78,14 @@ public class CASTParser {
 	
 		
 		
-		
+//		CASTVisitorTEST castVisitorTEST = new CASTVisitorTEST();
+//		castVisitorTEST.traverse(compileUnits);
 		triggerParser(compileUnits);
-		bindThreadRel();	
+//		bindThreadRel();	
 //		synchronizeParser(compileUnits);	
-		communicationParserPre(compileUnits);
-		System.out.println("FIRST FINISH");
-		communicatinoParserPost(compileUnits);
+//		communicationParserPre(compileUnits);
+//		System.out.println("FIRST FINISH");
+//		communicatinoParserPost(compileUnits);
 //		javaSrcMethod(compileUnits);
 		
 	}
@@ -336,6 +338,48 @@ public class CASTParser {
 			System.out.println(entry.getKey());
 			System.out.println(entry.getValue());
 		}
+		
+		for (Entry<String, ThreadInformation> thread1 : threadInfomations) {
+			for (Entry<String, ThreadInformation> thread2 : threadInfomations) {
+				if (isThreadRelated(thread1.getKey(), thread2.getKey())) {
+					System.out.println("THREAD:"+thread1.getKey()+"--TO--"+"THREAD:"+thread2.getKey());
+					System.out.println("___________________________COMMUNICATION_____________________________");
+					ThreadInformation threadInformation1 = thread1.getValue();
+					ThreadInformation threadInformation2 = thread2.getValue();
+					ArrayList<ShareVarInfo> threadDef = new ArrayList<>(threadInformation1.getDefList().values());
+					ArrayList<ShareVarInfo> threadUse = new ArrayList<>(threadInformation2.getUseList().values());
+					for (ShareVarInfo defVar : threadDef) {
+						for (ShareVarInfo useVar : threadUse) {
+							//类型相同且不属于同一函数
+							if (defVar.getType().equals(useVar.getType())&&!defVar.getBelongMethod().equals(useVar.getBelongMethod())) {
+								//原始函数做特殊处理(声明所属类，及声明行号相等)
+								if (defVar.isPrimitive()&&
+									defVar.getBelongClass().equals(useVar.getBelongClass())&&
+									defVar.getClassLineNumber()==useVar.getClassLineNumber()) {
+									System.out.println("FROM:");
+									System.out.println("PATH:"+defVar.getPath());
+									System.out.println("LINE:"+defVar.getLineNumber());
+									System.out.println(" TO :");
+									System.out.println("PATH:"+useVar.getPath());
+									System.out.println("LINE:"+useVar.getLineNumber());
+									System.out.println();
+								}
+								//不是原始类型
+								else if(!defVar.isPrimitive()){
+									System.out.println("FROM:");
+									System.out.println("PATH:"+defVar.getPath());
+									System.out.println("LINE:"+defVar.getLineNumber());
+									System.out.println(" TO :");
+									System.out.println("PATH:"+useVar.getPath());
+									System.out.println("LINE:"+useVar.getLineNumber());
+									System.out.println();
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 		System.out.println("DONE!");
 		System.out.flush();
 	}
@@ -442,7 +486,8 @@ public class CASTParser {
 		System.out.println("ThreadVarArray :"+threadVarArray.length);
 		for (ThreadVar threadVar1 : threadVarArray) {
 			for (ThreadVar threadVar2 : threadVarArray) {
-				if (threadVar1.getFilePath().equals(threadVar2.getFilePath())) {
+				if (threadVar1.getFilePath().equals(threadVar2.getFilePath())&&
+					!threadVar1.getBindingTypeName().equals(threadVar2.getBindingTypeName())) {
 					System.out.println("Tn the same file");
 					threadRelate.add(threadVar1.getBindingTypeName()+threadVar2.getBindingTypeName());
 					threadRelate.add(threadVar2.getBindingTypeName()+threadVar1.getBindingTypeName());					
@@ -453,6 +498,11 @@ public class CASTParser {
 		for (String threadRel : threadRelate) {
 			System.out.println("ThreadRelate:::"+threadRel);
 		}
+	}
+	
+	//线程是否相关
+	public boolean isThreadRelated(String key1,String key2) {
+		return threadRelate.contains(key1+key2)||threadRelate.contains(key2+key1);
 	}
 
 }
