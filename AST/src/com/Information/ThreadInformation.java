@@ -10,33 +10,33 @@ public class ThreadInformation {
 	private String filePath;
 	private int startLineNumber;
 	//Def”ÎUseºØ£¨Key£∫methodKey+––∫≈
-	private HashMap<String, ShareVarInfo> defList;
-	private HashMap<String, ShareVarInfo> useList;
+	private HashMap<String, ShareVarInfo> defHashMap;
+	private HashMap<String, ShareVarInfo> useHashMap;
 	
 	//setters and getters
 	public void addDefVar(String key,ShareVarInfo varInfo) {
-		if (defList.containsKey(key)) {
+		if (defHashMap.containsKey(key)) {
 			return;
 		}
-		defList.put(key,varInfo);
+		defHashMap.put(key,varInfo);
 	}
 	public void addUseVar(String key,ShareVarInfo varInfo) {
-		if (defList.containsKey(key)) {
+		if (defHashMap.containsKey(key)) {
 			return;
 		}
-		useList.put(key, varInfo);
+		useHashMap.put(key, varInfo);
 	}
 	public HashMap<String, ShareVarInfo> getDefList() {
-		return defList;
+		return defHashMap;
 	}
 	public void setDefList(HashMap<String, ShareVarInfo> defList) {
-		this.defList = defList;
+		this.defHashMap = defList;
 	}
 	public HashMap<String, ShareVarInfo> getUseList() {
-		return useList;
+		return useHashMap;
 	}
 	public void setUseList(HashMap<String, ShareVarInfo> useList) {
-		this.useList = useList;
+		this.useHashMap = useList;
 	}
 	public String getName() {
 		return name;
@@ -66,8 +66,8 @@ public class ThreadInformation {
 	public ThreadInformation(String name,ThreadType tType) {
 		this.name = name;
 		threadType = tType;
-		defList = new HashMap<>();
-		useList = new HashMap<>();
+		defHashMap = new HashMap<>();
+		useHashMap = new HashMap<>();
 	}
 	@Override
 	public String toString() {

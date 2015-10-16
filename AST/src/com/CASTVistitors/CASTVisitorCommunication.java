@@ -267,7 +267,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				PrefixExpression prefixExpression = (PrefixExpression) pNode;
 				String preOperator = prefixExpression.getOperator().toString();  //获取操作符
 				SimpleName preOperand = (SimpleName)castHelper.getKeyVarName(prefixExpression.getOperand()); //获取操作变量名
-				if (preOperand.getIdentifier().equals(node.getIdentifier())&&
+				if (preOperand!=null&&preOperand.getIdentifier().equals(node.getIdentifier())&&
 				    (preOperator.equals("++")||preOperator.equals("--"))) {
 					System.out.println("pre change!");
 					return true;
@@ -278,7 +278,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				PostfixExpression postfixExpression = (PostfixExpression) pNode;
 				String postOperator = postfixExpression.getOperator().toString();
 				SimpleName postOperand = (SimpleName)castHelper.getKeyVarName(postfixExpression.getOperand());
-				if (postOperand.getIdentifier().equals(node.getIdentifier())&&
+				if (postOperand!=null&&postOperand.getIdentifier().equals(node.getIdentifier())&&
 					(postOperator.equals("++")||postOperator.equals("--"))) {
 					System.out.println("post change!");
 					return true;
@@ -290,7 +290,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				SimpleName leftSimpleName = (SimpleName)CASTHelper.getInstance().getKeyVarName(assignment.getLeftHandSide());
 				System.out.println("Orin: "+node);
 				System.out.println("left: "+leftSimpleName);
-				if (leftSimpleName.getIdentifier().equals(node.getIdentifier())) {
+				if (leftSimpleName!=null&&leftSimpleName.getIdentifier().equals(node.getIdentifier())) {
 					System.out.println("equal");
 					return true;
 				}
@@ -343,6 +343,9 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		while(pNode!=compilationUnit){
 			if (pNode instanceof MethodInvocation) {
 				String methodKey = castHelper.getInvokeMethodKey(pNode);
+				if (methodKey==null) {
+					return;
+				}
 				//调用函数为工程中的函数,且还未加入线程函数表
 				if (!threadMethodMapTable.containsKey(methodKey)&&
 					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
@@ -363,6 +366,9 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			}
 			else if (pNode instanceof SuperMethodInvocation) {
 				String methodKey = castHelper.getInvokeMethodKey(pNode);
+				if (methodKey==null) {
+					return;
+				}
 				//调用函数为工程中的函数,且还未加入线程函数表
 				if (!threadMethodMapTable.containsKey(methodKey)&&
 					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
@@ -384,6 +390,8 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			pNode = pNode.getParent();
 		}
 	}
+	
+    
 	@Override
 	public boolean visit(SimpleName node) {
 		//确保simpleName 在线程相关的函数内(run,main及其调用的函数)
@@ -398,17 +406,20 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			//获取simpleName全名 a-->var.a.c
 			ASTNode astNode = castHelper.getVarName(node);
 			//从全名中获取核心 var.a.c 中的var
-			SimpleName astNode2 = (SimpleName) castHelper.getKeyVarName(astNode);
+			SimpleName keyVarName = (SimpleName) castHelper.getKeyVarName(astNode);
 
-			
-//			System.out.println("源变量名："+node.getIdentifier());
-//			System.out.println("真变量名："+astNode);
-			if (!node.getIdentifier().equals(astNode2.getIdentifier())) {
+/*			System.out.println(filePath);
+			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
+			System.out.println("源变量名："+node.getIdentifier());
+			System.out.println("中间全名："+astNode);
+			System.out.println("真变量名："+keyVarName);*/
+
+			if (keyVarName==null||!node.getIdentifier().equals(keyVarName.getIdentifier())) {
 				System.out.println("不相同");
 				return super.visit(node);
 			}
 			//获取定义的位置
-			DeclarePosition declarePosition = castHelper.varDeclaredPosition(astNode2);
+			DeclarePosition declarePosition = castHelper.varDeclaredPosition(keyVarName);
 			/* 1.局部变量
 			 * 2.java源码变量名（println）
 			 * 3.参数列表中的simpleName
@@ -423,7 +434,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			}
 
 			if (declarePosition==DeclarePosition.INMETHOD||
-			   (declarePosition==DeclarePosition.INPARAMETER&&isParaSimpleName(astNode2))) {
+			   (declarePosition==DeclarePosition.INPARAMETER&&isParaSimpleName(keyVarName))) {
 				return super.visit(node);
 			}
 			//参数变量但引用重置则不做处理
@@ -439,19 +450,27 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			}
 			//判断是属于Def集还是Use集
 			boolean isDefVar ;
-			isDefVar = isDefinExpression(astNode2);
+			System.out.println("NODE2:"+keyVarName);
+			isDefVar = isDefinExpression(keyVarName);
 			System.out.println("Beg____________________________________________________");
 			System.out.println(filePath);
 			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
-			System.out.println("Type_Name :"+node.resolveTypeBinding().getQualifiedName());
+			System.out.println("NODE:"+node);
+			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
+			System.out.println("Type_Name :"+((IVariableBinding)node.resolveBinding()).getType().getQualifiedName());
 			System.out.println(declarePosition);
 			System.out.println("is def: "+isDefVar);
-			System.out.println("simpleName:"+astNode2);
+			System.out.println("simpleName:"+keyVarName);
 			System.out.println("End____________________________________________________");
 			//信息提取<(包+类_行号_变量名),(行号、类型、路径)>
 			ThreadInformation threadInformation = threadInfo.get(threadKey);
 			int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-			String varType = node.resolveTypeBinding().getQualifiedName();
+			IVariableBinding variableBinding = (IVariableBinding)node.resolveBinding();
+			if (variableBinding==null) {
+				System.out.println("Binding error!");
+				return super.visit(node);	
+			}
+			String varType = variableBinding.getType().getQualifiedName();		
 			ShareVarInfo shareVarInfo = new ShareVarInfo(lineNumber, varType, filePath,methodKey);
 			//成员原始变量
 			if (declarePosition==DeclarePosition.INMEMBERPRIMITIVE) {

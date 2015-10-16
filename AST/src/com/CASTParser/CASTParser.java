@@ -46,16 +46,16 @@ import com.MDGHandle.Nodes.ThreadWaitNode;
 public class CASTParser {
 	private String projectPath;
 	private ArrayList<String> filePathList;
-	private HashMap<String, ThreadInformation> threadsInfo;
-	private HashMap<String, ThreadVar> threadVarHashMap;
+	private HashMap<String, ThreadInformation> threadsInfo;   //线程信息表
+	private HashMap<String, ThreadVar> threadVarHashMap;      //线程变量
 	/*
 	 * 用于记录线程运行中包含的函数调用
 	 * KEY:methodKey <包_类_函数_参数>
 	 * VALUE:线程key集   <包_类> BinaryName
 	 */
 	private HashMap<String, HashSet<String>> threadMethodMapTable; 
-	private Set<String> threadRelate;
-	private ArrayList<ThreadTriggerNode> threadTriggerNodes;
+	private Set<String> threadRelate;                 		  //线程相关记录
+	private ArrayList<ThreadTriggerNode> threadTriggerNodes;  //线程触发节点列表
 	//构造函数
 	public CASTParser(String projectPath) {
 		this.projectPath = projectPath;
@@ -66,7 +66,10 @@ public class CASTParser {
 		threadMethodMapTable = new HashMap<>();
 		threadRelate = new HashSet<>();
 	}
-
+	
+	/**
+	 * AST树解析，获取并发相关的节点与边的信息
+	 */
 	public void  parser() {
 		System.out.println("parsering");
 		//创建AST访问单元组
@@ -81,16 +84,19 @@ public class CASTParser {
 //		CASTVisitorTEST castVisitorTEST = new CASTVisitorTEST();
 //		castVisitorTEST.traverse(compileUnits);
 		triggerParser(compileUnits);
-//		bindThreadRel();	
+		bindThreadRel();	
 //		synchronizeParser(compileUnits);	
-//		communicationParserPre(compileUnits);
+		communicationParserPre(compileUnits);
 //		System.out.println("FIRST FINISH");
-//		communicatinoParserPost(compileUnits);
+		communicatinoParserPost(compileUnits);
 //		javaSrcMethod(compileUnits);
 		
 	}
 	
-	//线程启动边解析
+	/**
+	 * 线程启动边解析
+	 * @param compileUnits ：编译单元列表
+	 */
 	public void triggerParser(ArrayList<CompileUnit> compileUnits) {
 		//用于获取线程相关类的信息，线程变量集，线程启动点
 		CASTVisitorTrigger castVisitor = new CASTVisitorTrigger(threadsInfo,threadVarHashMap,threadTriggerNodes,threadMethodMapTable);
@@ -148,7 +154,11 @@ public class CASTParser {
 			System.out.println("______________________________________TRIGGER_______________________________________");
 		}
 	}
-	//线程同步依赖解析
+
+	/**
+	 * 线程同步依赖解析
+	 * @param compileUnits ：编译单元列表
+	 */
 	public void synchronizeParser(ArrayList<CompileUnit> compileUnits) {
 		CASTVisitorSyn castVisitorSyn = new CASTVisitorSyn();
 		castVisitorSyn.traverse(compileUnits);
@@ -188,28 +198,23 @@ public class CASTParser {
 			System.out.println("______________________________________SYND_______________________________________");
 		}
 	}
-	//线程通信依赖解析--函数信息获取
+	
+	/**
+	 * 线程通信依赖解析--函数信息获取
+	 * @param compileUnits ：编译单元列表
+	 */
 	public void communicationParserPre(ArrayList<CompileUnit> compileUnits) {
 		// 1.先将赋值语句，前缀表达式，后缀表达式会引起变量变化的函数记录下来
 		CASTVisitorPrepare castVisitorPrepare = new CASTVisitorPrepare();
 		castVisitorPrepare.traverse(compileUnits);
 		//函数修改变量的信息
 		HashMap<String, MethodInformation> changeMethods = castVisitorPrepare.getChangeMethods();
-		// 2.将函数调用引起变量改变的函数添加进记录表
-		
-		
+		// 2.将函数调用引起变量改变的函数添加进记录表		
 		int times = 1;     //迭代次数
 		CASTVisitorCheck castVisitorCheck = new CASTVisitorCheck(changeMethods);
 		do {
 			castVisitorCheck.traverse(compileUnits);    //处理函数信息
-	
-//			Set<Map.Entry<String, MethodInformation>> methodInformationxx = changeMethods.entrySet();
-//			for (Entry<String, MethodInformation> entry : methodInformationxx) {
-//				System.out.println("KEY:"+entry.getKey());
-//				System.out.println("VALUE:"+entry.getValue());
-//			}
 			System.out.println("The "+(times++)+"  time");
-//			System.out.println("The size is"+methodInformationxx.size());
 		} while (castVisitorCheck.isMethodInfoChange());		
 		System.out.println("Method Change handle is finished total number is :"+changeMethods.size());
 		
@@ -288,27 +293,20 @@ public class CASTParser {
 		System.out.println("After reduce the methods size is :"+changeMethods.size());
 		System.out.println("The total times is :"+times);
 	}
-	//线程通信依赖解析--Def与Use
+	
+	/**
+	 * 线程通信依赖解析--Def与Use
+	 * @param compileUnits ：编译单元列表
+	 */
 	public void communicatinoParserPost(ArrayList<CompileUnit> compileUnits) {
 		CASTVisitorCommunication castVisitorCommunication = new CASTVisitorCommunication(threadMethodMapTable,threadsInfo);
 		do {
 			castVisitorCommunication.traverse(compileUnits);
 		} while (castVisitorCommunication.isUpdate());
-		
-//		Set<Map.Entry<String, ThreadInformation>> set = threadsInfo.entrySet();
-//		for (Entry<String, ThreadInformation> entry : set) {
-//			System.out.println("KEY:"+entry.getKey());
-//			System.out.println("VALUE:"+entry.getValue());
-//		}
+
 		System.out.println(threadsInfo.size());
-//		System.out.println(threadMethodMapTable);
 		System.out.println(threadMethodMapTable.size());
 		
-//		Set<Map.Entry<String, String>> set = threadMethodMapTable.entrySet();
-//		for (Entry<String, String> entry : set) {
-//			System.out.println("KEY:"+entry.getKey());
-//			System.out.println("VALUE:"+entry.getValue());
-//		}
 		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
 		for (Entry<String, ThreadInformation> entry : threadInfomations) {
 			System.out.println("< Thread: "+entry.getKey()+" >");
@@ -338,7 +336,7 @@ public class CASTParser {
 			System.out.println(entry.getKey());
 			System.out.println(entry.getValue());
 		}
-		
+		System.out.println(threadRelate);
 		for (Entry<String, ThreadInformation> thread1 : threadInfomations) {
 			for (Entry<String, ThreadInformation> thread2 : threadInfomations) {
 				if (isThreadRelated(thread1.getKey(), thread2.getKey())) {
@@ -383,7 +381,11 @@ public class CASTParser {
 		System.out.println("DONE!");
 		System.out.flush();
 	}
-	//java源码函数解析
+	
+	/**
+	 * java源码函数解析，用于提取会改变调用对象或参数的函数
+	 * @param compileUnits
+	 */
 	public void javaSrcMethod(ArrayList<CompileUnit> compileUnits) {
 		// 1.先将赋值语句，前缀表达式，后缀表达式会引起变量变化的函数记录下来
 		CASTVisitorJavaMethodsPrepare castVisitorTest = new CASTVisitorJavaMethodsPrepare();
@@ -473,13 +475,20 @@ public class CASTParser {
 		System.out.println("The methods size is :"+changeMethods.size());
 		System.out.println("The total times is :"+times);
 	}
-	//打印文件列表
+	
+	/**
+	 * 打印文件列表
+	 */
 	public void  printFiles() {
 		for (String fileName : filePathList) {
 			System.out.println(fileName);
 		}
 	}
-	//将相关的线程进行绑定
+	
+	/**
+	 * 将相关的线程进行绑定
+	 * 并存入线程相关集
+	 */
 	public void bindThreadRel() {
 		ThreadVar[] threadVarArray = new ThreadVar[threadVarHashMap.size()];
 		threadVarHashMap.values().toArray(threadVarArray);
@@ -500,7 +509,12 @@ public class CASTParser {
 		}
 	}
 	
-	//线程是否相关
+	/**
+	 * 线程是否相关
+	 * @param key1 ：线程1
+	 * @param key2: 线程2
+	 * @return 是否相关
+	 */
 	public boolean isThreadRelated(String key1,String key2) {
 		return threadRelate.contains(key1+key2)||threadRelate.contains(key2+key1);
 	}

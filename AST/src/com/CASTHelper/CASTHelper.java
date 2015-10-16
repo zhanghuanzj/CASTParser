@@ -9,6 +9,7 @@ import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
 import org.eclipse.jdt.core.dom.ArrayAccess;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
 import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.FieldDeclaration;
 import org.eclipse.jdt.core.dom.ITypeBinding;
@@ -50,7 +51,7 @@ public class CASTHelper {
 	public static CASTHelper getInstance() {
 		return CAST_HELPER;
 	}
-	/**变量声明位置的处理
+	/**变量声明位置的处理,用来得到声明变量具体声明的位置
 	 * 
 	 * @param decNode：变量声明节点
 	 * @return 变量定义的位置
@@ -64,8 +65,7 @@ public class CASTHelper {
 				FieldDeclaration fieldDeclaration = (FieldDeclaration)decNode.getParent();
 				List<?> list = fieldDeclaration.modifiers();
 				for (Object object : list) {
-					Modifier modifier = (Modifier)object;
-					if (modifier.isFinal()) {
+					if (object instanceof Modifier&&((Modifier)object).isFinal()) {
 						isFinal = true;
 					}
 				}
@@ -184,9 +184,11 @@ public class CASTHelper {
 			} while (pNode.getParent() instanceof SuperFieldAccess);	
 			return pNode;
 		}
+		
 		//4.simepleName
 		return astNode;
 	}
+	
 	//得到关键的simpleName
 	public ASTNode getKeyVarName(ASTNode astNode) {
 		//1.SimpleName__var
@@ -221,10 +223,21 @@ public class CASTHelper {
 			ArrayAccess access = (ArrayAccess)astNode;
 			return getKeyVarName(access.getArray());
 		}
+		else if (astNode instanceof ExpressionStatement) {
+			ExpressionStatement expressionStatement = (ExpressionStatement)astNode;
+			return getKeyVarName(expressionStatement.getExpression());
+		}
+		else if (astNode instanceof MethodInvocation){
+			 MethodInvocation methodInvocation = (MethodInvocation)astNode;
+			 return getKeyVarName(methodInvocation.getExpression());
+		}
 		return null;
 	}
 	// 获取Node所在函数的KEY
 	public String methodKey(ASTNode node) {	
+		if (node==null) {
+			return null;
+		}
 		//获取所在         < 函数名+参数列表>   （为了区分重载情况）
 		ASTNode pNode = node;
 		while(!(pNode instanceof MethodDeclaration)){

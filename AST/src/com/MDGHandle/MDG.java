@@ -27,7 +27,7 @@ public class MDG {
 	}
 	public static void main(String[] args) {
 		System.out.println("Begin parser");
-		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase06");
+		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase08");
 		mdg.handleAst();
 		System.out.println("finish");
 	}
