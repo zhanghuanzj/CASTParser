@@ -20,14 +20,15 @@ public class MDG {
 		cAstParser = new CASTParser(projectPath);
 	}
 	public void handleAst() {
-		Node e = new Node("jack", 12);
-		nodeList.add(e);
 		System.out.println("Handling AST information");
 		cAstParser.parser();
 	}
 	public static void main(String[] args) {
 		System.out.println("Begin parser");
-		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase08");
+		//所需构建依赖图的源码工程路径设置
+		/********************************************************************/
+		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase01");
+		/********************************************************************/
 		mdg.handleAst();
 		System.out.println("finish");
 	}

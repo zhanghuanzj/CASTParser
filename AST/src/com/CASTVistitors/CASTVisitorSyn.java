@@ -5,11 +5,18 @@ import java.util.ArrayList;
 
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.ArrayAccess;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.ExpressionStatement;
+import org.eclipse.jdt.core.dom.FieldAccess;
 import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.QualifiedName;
 import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.SuperFieldAccess;
+import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 
+import com.CASTHelper.CASTHelper;
 import com.CASTParser.CompileUnit;
 import com.MDGHandle.Nodes.NotifyType;
 import com.MDGHandle.Nodes.ThreadNotifyNode;
@@ -19,8 +26,8 @@ import com.MDGHandle.Nodes.WaitType;
 public class CASTVisitorSyn extends ASTVisitor {
 	private CompilationUnit compilationUnit ;
 	private String filePath;
-	private ArrayList<ThreadNotifyNode> threadNotifyNodes;
-	private ArrayList<ThreadWaitNode> threadWaitNodes;
+	private ArrayList<ThreadNotifyNode> threadNotifyNodes;         //线程通知节点
+	private ArrayList<ThreadWaitNode> threadWaitNodes;             //线程阻塞节点
 	
 	public ArrayList<ThreadNotifyNode> getThreadNotifyNodes() {
 		return threadNotifyNodes;
@@ -36,7 +43,11 @@ public class CASTVisitorSyn extends ASTVisitor {
 		this.threadWaitNodes = new ArrayList<>();
 	}
 
-	//返回函数调用所在的类名
+	/**
+	 * 返回函数调用所在的类名
+	 * @param node ： 函数调用节点
+	 * @return     ：返回函数调用所在的类
+	 */
 	public String acquireTheClass(MethodInvocation node) {
 		String className="";
 		ASTNode parent = node;	
@@ -44,49 +55,47 @@ public class CASTVisitorSyn extends ASTVisitor {
 			parent = parent.getParent();
 			if (parent instanceof TypeDeclaration) {
 				TypeDeclaration typeDeclaration = (TypeDeclaration)parent;
-				className = typeDeclaration.resolveBinding().getQualifiedName();	
-				if (className.equals("")) {
-					className = typeDeclaration.resolveBinding().getBinaryName();
-				}
+				className = typeDeclaration.resolveBinding().getBinaryName();
 				break;
 			}
 		} while (parent != compilationUnit);
 		return className;
 	}
-	//获取唤醒节点以及阻塞节点的信息
+	
+	
+
+	
+	/**
+	 * 获取唤醒节点以及阻塞节点的信息提取
+	 */
 	@Override
 	public boolean visit(MethodInvocation node) {
-		System.out.println("22222222222222222");
 		String methodName = node.getName().toString();
 		//行号
 		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
 		if (methodName.equals("notify")||methodName.equals("notifyAll")||
 			methodName.equals("signal")||methodName.equals("signalAll")||methodName.equals("countDown")) {
 			if (node.getExpression()==null) {
-				ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,acquireTheClass(node),"this");
+				ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,acquireTheClass(node));
 				threadNotifyNodes.add(threadNotifyNode);
 			}
 			else {
-				if (node.getExpression() instanceof SimpleName) {
-					SimpleName simpleName = (SimpleName)node.getExpression();
-					String objectTypeName = simpleName.resolveTypeBinding().getQualifiedName();
-					String objectName = simpleName.getIdentifier();
-					ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,objectTypeName,objectName);
+				String objectTypeName = CASTHelper.getInstance().getObjectName(node.getExpression());
+				if (objectTypeName!=null) {
+					ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,objectTypeName);
 					threadNotifyNodes.add(threadNotifyNode);
 				}
 			}
 		}
 		else if(methodName.equals("wait")||methodName.equals("await")) {
 			if (node.getExpression()==null) {
-				ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,acquireTheClass(node),"this");
+				ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,acquireTheClass(node));
 				threadWaitNodes.add(threadWaitNode);
 			}
 			else {
-				if (node.getExpression() instanceof SimpleName) {
-					SimpleName simpleName = (SimpleName)node.getExpression();
-					String objectTypeName = simpleName.resolveTypeBinding().getQualifiedName();
-					String objectName = simpleName.getIdentifier();
-					ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,objectTypeName,objectName);
+				String objectTypeName = CASTHelper.getInstance().getObjectName(node.getExpression());
+				if (objectTypeName!=null) {
+					ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,objectTypeName);
 					threadWaitNodes.add(threadWaitNode);
 				}
 			}

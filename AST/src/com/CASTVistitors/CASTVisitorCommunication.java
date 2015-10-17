@@ -58,7 +58,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	 * KEY:methodKey <包_类_函数_参数>
 	 * VALUE:线程信息key <包_类> BinaryName
 	 */
-	private HashMap<String, HashSet<String>> threadMethodMapTable;     		//用于记录线程运行中包含的函数调用
+	private HashMap<String, HashSet<String>> threadMethodMapTable;  //用于记录线程运行中包含的函数调用
 	private HashMap<String, ThreadInformation> threadInfo;			//线程信息表，用于记录def，use
 	private CASTHelper castHelper;
 	private static int accessNum = 1;
@@ -68,7 +68,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	private HashMap<String, MethodInformation> javaMethodsInfo; 	//java源码函数信息
 	private HashMap<String, Integer> sourceMethodsMapTable;     	//工程包名映射表
 	private HashMap<String, Integer> javaMethodsMapTable;       	//java包名映射表
-	private Set<String> synMethodSet;
+	private Set<String> synMethodSet;                               //同步函数集    
 
 	{
 		File file = new File("javaMethodsInfo\\javaMethodInfo.obj");
@@ -266,7 +266,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			if (pNode instanceof PrefixExpression) {
 				PrefixExpression prefixExpression = (PrefixExpression) pNode;
 				String preOperator = prefixExpression.getOperator().toString();  //获取操作符
-				SimpleName preOperand = (SimpleName)castHelper.getKeyVarName(prefixExpression.getOperand()); //获取操作变量名
+				SimpleName preOperand = (SimpleName)castHelper.getLeftVarName(prefixExpression.getOperand()); //获取操作变量名
 				if (preOperand!=null&&preOperand.getIdentifier().equals(node.getIdentifier())&&
 				    (preOperator.equals("++")||preOperator.equals("--"))) {
 					System.out.println("pre change!");
@@ -277,7 +277,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			else if (pNode instanceof PostfixExpression) {	
 				PostfixExpression postfixExpression = (PostfixExpression) pNode;
 				String postOperator = postfixExpression.getOperator().toString();
-				SimpleName postOperand = (SimpleName)castHelper.getKeyVarName(postfixExpression.getOperand());
+				SimpleName postOperand = (SimpleName)castHelper.getLeftVarName(postfixExpression.getOperand());
 				if (postOperand!=null&&postOperand.getIdentifier().equals(node.getIdentifier())&&
 					(postOperator.equals("++")||postOperator.equals("--"))) {
 					System.out.println("post change!");
@@ -287,7 +287,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			//3.赋值表达式
 			else if (pNode instanceof Assignment) {
 				Assignment assignment = (Assignment) pNode;
-				SimpleName leftSimpleName = (SimpleName)CASTHelper.getInstance().getKeyVarName(assignment.getLeftHandSide());
+				SimpleName leftSimpleName = (SimpleName)CASTHelper.getInstance().getLeftVarName(assignment.getLeftHandSide());
 				System.out.println("Orin: "+node);
 				System.out.println("left: "+leftSimpleName);
 				if (leftSimpleName!=null&&leftSimpleName.getIdentifier().equals(node.getIdentifier())) {
@@ -404,9 +404,9 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			//函数调用记录
 			methodRecord(node, threadKey);
 			//获取simpleName全名 a-->var.a.c
-			ASTNode astNode = castHelper.getVarName(node);
+			ASTNode astNode = castHelper.getVarFullName(node);
 			//从全名中获取核心 var.a.c 中的var
-			SimpleName keyVarName = (SimpleName) castHelper.getKeyVarName(astNode);
+			SimpleName keyVarName = (SimpleName) castHelper.getLeftVarName(astNode);
 
 /*			System.out.println(filePath);
 			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));

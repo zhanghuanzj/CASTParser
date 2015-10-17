@@ -160,8 +160,13 @@ public class CASTHelper {
 		}
 		return DeclarePosition.INMETHOD;
 	}
-	//得到simpleName所属的最终变量全名
-	public ASTNode getVarName(ASTNode astNode) {
+	
+	/**
+	 * 得到simpleName所属的最终变量全名
+	 * @param astNode 变量节点
+	 * @return  变量全名
+	 */
+	public ASTNode getVarFullName(ASTNode astNode) {
 		ASTNode pNode = astNode;
 		//1.obj.name
 		if(pNode.getParent() instanceof QualifiedName){
@@ -189,8 +194,12 @@ public class CASTHelper {
 		return astNode;
 	}
 	
-	//得到关键的simpleName
-	public ASTNode getKeyVarName(ASTNode astNode) {
+	/**
+	 * 得到全名的最左名
+	 * @param astNode 全名节点
+	 * @return  全名的最左变量名
+	 */
+	public ASTNode getLeftVarName(ASTNode astNode) {
 		//1.SimpleName__var
 		if (astNode instanceof SimpleName) {                            
 			return astNode;
@@ -200,7 +209,7 @@ public class CASTHelper {
 			QualifiedName qualifiedName = (QualifiedName) astNode;
 			//找到最外面的那个对象xx.x.i中的xx
 			if(!(qualifiedName.getQualifier() instanceof SimpleName)){
-				return getKeyVarName(qualifiedName.getQualifier());
+				return getLeftVarName(qualifiedName.getQualifier());
 			}
 			return qualifiedName.getQualifier();
 		}
@@ -209,7 +218,7 @@ public class CASTHelper {
 			FieldAccess fieldAccess = (FieldAccess) astNode;
 			//this.a.b找到最外面的那个对象
 			if (!(fieldAccess.getExpression() instanceof ThisExpression)) {
-				return getKeyVarName(fieldAccess.getExpression());
+				return getLeftVarName(fieldAccess.getExpression());
 			}
 			return fieldAccess.getName();
 		}
@@ -221,18 +230,60 @@ public class CASTHelper {
 		//5.ArrayAccess buffer[tail++]  取buffer
 		else if (astNode instanceof ArrayAccess) {
 			ArrayAccess access = (ArrayAccess)astNode;
-			return getKeyVarName(access.getArray());
+			return getLeftVarName(access.getArray());
 		}
 		else if (astNode instanceof ExpressionStatement) {
 			ExpressionStatement expressionStatement = (ExpressionStatement)astNode;
-			return getKeyVarName(expressionStatement.getExpression());
+			return getLeftVarName(expressionStatement.getExpression());
 		}
 		else if (astNode instanceof MethodInvocation){
 			 MethodInvocation methodInvocation = (MethodInvocation)astNode;
-			 return getKeyVarName(methodInvocation.getExpression());
+			 return getLeftVarName(methodInvocation.getExpression());
 		}
 		return null;
 	}
+
+	/**
+	 * 得到全名的最右名
+	 * @param astNode 全名节点
+	 * @return 全名的最右变量名
+	 */
+	public String getObjectName(ASTNode astNode) {
+		//1.SimpleName__var
+		if (astNode instanceof SimpleName&&((SimpleName)astNode).resolveTypeBinding()!=null) {                            
+			return ((SimpleName)astNode).resolveTypeBinding().getBinaryName();
+		}
+		//2.QualifiedName__obj.var
+		else if(astNode instanceof QualifiedName) {                      
+			QualifiedName qualifiedName = (QualifiedName) astNode;
+			return getObjectName(qualifiedName.getName());
+		}
+		//3.FieldAccess__this.var
+		else if (astNode instanceof FieldAccess) {
+			FieldAccess fieldAccess = (FieldAccess) astNode;
+			return getObjectName(fieldAccess.getName());
+		}
+		//4.SuperFieldAccess__super.var
+		else if (astNode instanceof SuperFieldAccess) {
+			SuperFieldAccess superFieldAccess = (SuperFieldAccess) astNode;
+			return getObjectName(superFieldAccess.getName());
+		}
+		//5.ArrayAccess buffer[tail++]  取buffer
+		else if (astNode instanceof ArrayAccess) {
+			ArrayAccess access = (ArrayAccess)astNode;
+			return getObjectName(access.getArray());
+		}
+		else if (astNode instanceof ExpressionStatement) {
+			ExpressionStatement expressionStatement = (ExpressionStatement)astNode;
+			return getObjectName(expressionStatement.getExpression());
+		}
+		else if (astNode instanceof MethodInvocation){
+			 MethodInvocation methodInvocation = (MethodInvocation)astNode;
+			 return getObjectName(methodInvocation.getName());
+		}
+		return null;
+	}
+	
 	// 获取Node所在函数的KEY
 	public String methodKey(ASTNode node) {	
 		if (node==null) {
@@ -378,7 +429,7 @@ public class CASTHelper {
 			MethodInvocation methodInvocation = (MethodInvocation)methodInvoke;
 			ASTNode astNode = methodInvocation.getExpression();
 			if (astNode!=null) {
-				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				SimpleName varName = (SimpleName)getLeftVarName(astNode);
 				//若为调用函数的对象则返回-2
 				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
 					System.out.println("对象调用函数");
@@ -390,7 +441,7 @@ public class CASTHelper {
 			//逐一考察参数列表中的参数
 			for (Object object : argumetns) {
 				astNode = (ASTNode)object;
-				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				SimpleName varName = (SimpleName)getLeftVarName(astNode);
 				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
 					System.out.println("INDEX: "+index);
 					return index;
@@ -405,7 +456,7 @@ public class CASTHelper {
 			ASTNode astNode;
 			for (Object object : arguments) {
 				astNode = (ASTNode)object;
-				SimpleName varName = (SimpleName)getKeyVarName(astNode);
+				SimpleName varName = (SimpleName)getLeftVarName(astNode);
 				if (varName!=null&&varName.getIdentifier().equals(simpleName.getIdentifier())) {
 					System.out.println("INDEX: "+index);
 					return index;

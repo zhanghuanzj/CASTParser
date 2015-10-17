@@ -72,24 +72,21 @@ public class CASTParser {
 	 */
 	public void  parser() {
 		System.out.println("parsering");
-		//创建AST访问单元组
+		//AST树的创建与编译单元组的获取
 		CFileASTRequestor cFileASTRequestor = new CFileASTRequestor();
 		CASTCreater castCreater = new CASTCreater(projectPath,cFileASTRequestor);
 		castCreater.createASTs();
 		ArrayList<CompileUnit> compileUnits = cFileASTRequestor.getCompileUnits();
 		
 	
-		
-		
-//		CASTVisitorTEST castVisitorTEST = new CASTVisitorTEST();
-//		castVisitorTEST.traverse(compileUnits);
-		triggerParser(compileUnits);
-		bindThreadRel();	
-//		synchronizeParser(compileUnits);	
-		communicationParserPre(compileUnits);
+		//MDG依赖边的解析与获取
+		triggerParser(compileUnits);                 //1.线程触发边解析
+		bindThreadRel();							 //相关线程绑定
+		synchronizeParser(compileUnits);			 //2.同步依赖解析
+//		communicationParserPre(compileUnits);
 //		System.out.println("FIRST FINISH");
-		communicatinoParserPost(compileUnits);
-//		javaSrcMethod(compileUnits);
+//		communicatinoParserPost(compileUnits);       //3.通信依赖解析
+//		javaSrcMethod(compileUnits);                 //java源码函数解析
 		
 	}
 	
@@ -173,22 +170,21 @@ public class CASTParser {
 		ArrayList<Edge> edges = new ArrayList<>();
 		for (ThreadNotifyNode threadNotifyNode : threadNotifyNodes) {
 			for (ThreadWaitNode threadWaitNode : threadWaitNodes) {
-				//属于同一个类中
-				if(threadNotifyNode.getFileName().equals(threadWaitNode.getFileName())){
-					if (threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())) {
-						Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
-						Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
-						Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
-						edges.add(edge);
-					}
+				//1.属于同一个类中且对象类型相同
+				if(threadNotifyNode.getFileName().equals(threadWaitNode.getFileName())&&
+				   threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())){
+					Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
+					Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
+					Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
+					edges.add(edge);
 				}
-				else if(threadRelate.contains(threadNotifyNode.getClassName()+threadWaitNode.getClassName())) {
-					if (threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())) {
-						Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
-						Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
-						Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
-						edges.add(edge);
-					}
+				//2.线程相关且对象类型相等
+				else if(threadRelate.contains(threadNotifyNode.getClassName()+threadWaitNode.getClassName())&&
+						threadNotifyNode.getObjectTypeName().equals(threadWaitNode.getObjectTypeName())) {
+					Node from = new Node(threadNotifyNode.getFileName(), threadNotifyNode.getLineNumber());
+					Node to = new Node(threadWaitNode.getFileName(), threadWaitNode.getLineNumber());
+					Edge edge = new Edge(from, to, ThreadEdgeType.THREADSYND);
+					edges.add(edge);
 				}
 			}
 		}
