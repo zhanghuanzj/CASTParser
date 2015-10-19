@@ -1,8 +1,11 @@
 package com.CASTHelper;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
@@ -36,7 +39,6 @@ public class CASTHelper {
 	HashSet<String> varType = new HashSet<>();
 	double []a;
 	private final static CASTHelper CAST_HELPER = new CASTHelper();
-	private String jdfj;
 	private CASTHelper() {	
 		varType.add("String");
 		varType.add("Short");
@@ -284,6 +286,95 @@ public class CASTHelper {
 		return null;
 	}
 	
+	/**
+	 * 获取语句最终得到的对象的ITypeBinding
+	 * @param astNode ASTNode
+	 * @return  对象的ITypeBinding
+	 */
+	public ITypeBinding getResolveTypeBinding(ASTNode astNode) {
+		//1.SimpleName__var
+		if (astNode instanceof SimpleName&&((SimpleName)astNode).resolveTypeBinding()!=null) {                            
+			return ((SimpleName)astNode).resolveTypeBinding();
+		}
+		//2.QualifiedName__obj.var
+		else if(astNode instanceof QualifiedName) {                      
+			QualifiedName qualifiedName = (QualifiedName) astNode;
+			return getResolveTypeBinding(qualifiedName.getName());
+		}
+		//3.FieldAccess__this.var
+		else if (astNode instanceof FieldAccess) {
+			FieldAccess fieldAccess = (FieldAccess) astNode;
+			return getResolveTypeBinding(fieldAccess.getName());
+		}
+		//4.SuperFieldAccess__super.var
+		else if (astNode instanceof SuperFieldAccess) {
+			SuperFieldAccess superFieldAccess = (SuperFieldAccess) astNode;
+			return getResolveTypeBinding(superFieldAccess.getName());
+		}
+		//5.ArrayAccess buffer[tail++]  取buffer
+		else if (astNode instanceof ArrayAccess) {
+			ArrayAccess access = (ArrayAccess)astNode;
+			return getResolveTypeBinding(access.getArray());
+		}
+		else if (astNode instanceof ExpressionStatement) {
+			ExpressionStatement expressionStatement = (ExpressionStatement)astNode;
+			return getResolveTypeBinding(expressionStatement.getExpression());
+		}
+		else if (astNode instanceof MethodInvocation&&((MethodInvocation)astNode).resolveMethodBinding()!=null){
+			 MethodInvocation methodInvocation = (MethodInvocation)astNode;
+			 return methodInvocation.resolveMethodBinding().getReturnType();
+		}
+		return null;
+	}
+	/**
+	 * 判断类型绑定是否为线程相关的类型
+	 * @param node ：类型绑定节点
+	 * @return 判断结果
+	 */
+	public boolean isThreadRelate(ITypeBinding node) {
+		if (node==null) {
+			return false;
+		}
+		if (node.getSuperclass()!=null) {
+			String supClass = node.getSuperclass().getName();
+			//正则表达式匹配,用于匹配RecursiveTask<T>
+			String rTask ="RecursiveTask<.*>";
+		    Pattern recursiveTaskPattern = Pattern.compile(rTask);
+		    Matcher rMatcher = recursiveTaskPattern.matcher(supClass);
+		    //正则表达式匹配,用于匹配FutureTask<T>
+		    String futureTask = "FutureTask<.*>";
+		    Pattern futureTaskPattern = Pattern.compile(futureTask);
+		    Matcher fmMatcher = futureTaskPattern.matcher(supClass);
+			if (supClass.equals("Thread")||supClass.equals("RecursiveAction")||rMatcher.find()||fmMatcher.find()) { 
+				return true;
+			}
+		}
+		ITypeBinding[] interfaces = node.getInterfaces();
+		if (interfaces.length>0) {
+			ArrayList<String> interfaceNames = new ArrayList<>();
+			//正则表达式匹配，Callable<T>
+			String callableMatch = "Callable<.*>";
+			Pattern callablePattern = Pattern.compile(callableMatch);
+			//正则表达式匹配，Future<T>
+			String futureMatch = "Future<.*>";
+			Pattern futurePattern = Pattern.compile(futureMatch);
+			//正则表达式匹配，RunnableFuture<T>
+			String rFutureMatch = "RunnableFuture<.*>";
+			Pattern rFuturePattern = Pattern.compile(rFutureMatch);
+			for(int i=0;i<interfaces.length;i++){
+				interfaceNames.add(interfaces[i].getName());			
+			}
+			for (String interfaceName : interfaceNames) {
+				Matcher cMatcher = callablePattern.matcher(interfaceName);
+				Matcher fMatcher = futurePattern.matcher(interfaceName);
+				Matcher rMatcher = rFuturePattern.matcher(interfaceName);
+				if (interfaceName.equals("Runnable")||cMatcher.find()||fMatcher.find()||rMatcher.find()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 	// 获取Node所在函数的KEY
 	public String methodKey(ASTNode node) {	
 		if (node==null) {

@@ -23,15 +23,16 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.SynchronizedStatement;
 
 import com.CASTVistitors.CASTVisitorTrigger;
-import com.CASTVistitors.CASTVisitorCheck;
+import com.CASTVistitors.CASTVisitorSrcMethodsCheck;
 import com.CASTVistitors.CASTVisitorCommunication;
+import com.CASTVistitors.CASTVisitorInterrupt;
 import com.CASTVistitors.CASTVisitorJavaMethodsCheck;
 import com.CASTVistitors.CASTVisitorJavaMethodsPrepare;
-import com.CASTVistitors.CASTVisitorSyn;
-import com.CASTVistitors.CASTVisitorTEST;
-import com.CASTVistitors.CASTVisitorPrepare;
+import com.CASTVistitors.CASTVisitorSynchronize;
+import com.CASTVistitors.CASTVisitorSrcMethodsPrepare;
 import com.Information.MethodInformation;
 import com.Information.ShareVarInfo;
 import com.Information.ThreadInformation;
@@ -39,6 +40,7 @@ import com.Information.ThreadVar;
 import com.MDGHandle.Edges.Edge;
 import com.MDGHandle.Edges.ThreadEdgeType;
 import com.MDGHandle.Nodes.Node;
+import com.MDGHandle.Nodes.ThreadInterruptNode;
 import com.MDGHandle.Nodes.ThreadNotifyNode;
 import com.MDGHandle.Nodes.ThreadTriggerNode;
 import com.MDGHandle.Nodes.ThreadWaitNode;
@@ -49,7 +51,7 @@ public class CASTParser {
 	private HashMap<String, ThreadInformation> threadsInfo;   //线程信息表
 	private HashMap<String, ThreadVar> threadVarHashMap;      //线程变量
 	/*
-	 * 用于记录线程运行中包含的函数调用
+	 * 用于记录每个线程运行中包含的函数调用
 	 * KEY:methodKey <包_类_函数_参数>
 	 * VALUE:线程key集   <包_类> BinaryName
 	 */
@@ -82,10 +84,11 @@ public class CASTParser {
 		//MDG依赖边的解析与获取
 		triggerParser(compileUnits);                 //1.线程触发边解析
 		bindThreadRel();							 //相关线程绑定
-		synchronizeParser(compileUnits);			 //2.同步依赖解析
+//		synchronizeParser(compileUnits);			 //2.同步依赖解析
 //		communicationParserPre(compileUnits);
 //		System.out.println("FIRST FINISH");
 //		communicatinoParserPost(compileUnits);       //3.通信依赖解析
+		interruptParser(compileUnits);
 //		javaSrcMethod(compileUnits);                 //java源码函数解析
 		
 	}
@@ -127,13 +130,24 @@ public class CASTParser {
 		for (ThreadTriggerNode threadTiggerNode : threadTriggerNodes) {
 			ThreadTriggerNode from = threadTiggerNode;
 			String threadVarKey = from.getThreadVarKey();
+			String threadInfoKey;
 			if (!threadVarHashMap.containsKey(threadVarKey)) {
-				continue;
+				if (!threadsInfo.containsKey(threadVarKey)) {
+					continue;
+				}
+				//触发节点中直接存储着线程key
+				else{
+					threadInfoKey = threadVarKey;
+				}
 			}
-			String threadInfoKey = threadVarHashMap.get(threadVarKey).getThreadInfoKey();
-			if (!threadsInfo.containsKey(threadInfoKey)) {
-				continue;
+			//属于线程变量调用开始
+			else{
+				threadInfoKey = threadVarHashMap.get(threadVarKey).getThreadInfoKey();
+				if (!threadsInfo.containsKey(threadInfoKey)) {
+					continue;
+				}
 			}
+			
 			ThreadInformation threadInformation = threadsInfo.get(threadInfoKey);
 			if (threadInformation!=null) {
 				String filePath = threadInformation.getFilePath();
@@ -157,7 +171,7 @@ public class CASTParser {
 	 * @param compileUnits ：编译单元列表
 	 */
 	public void synchronizeParser(ArrayList<CompileUnit> compileUnits) {
-		CASTVisitorSyn castVisitorSyn = new CASTVisitorSyn();
+		CASTVisitorSynchronize castVisitorSyn = new CASTVisitorSynchronize();
 		castVisitorSyn.traverse(compileUnits);
 		ArrayList<ThreadNotifyNode> threadNotifyNodes = castVisitorSyn.getThreadNotifyNodes();
 		ArrayList<ThreadWaitNode> threadWaitNodes = castVisitorSyn.getThreadWaitNodes();
@@ -201,13 +215,13 @@ public class CASTParser {
 	 */
 	public void communicationParserPre(ArrayList<CompileUnit> compileUnits) {
 		// 1.先将赋值语句，前缀表达式，后缀表达式会引起变量变化的函数记录下来
-		CASTVisitorPrepare castVisitorPrepare = new CASTVisitorPrepare();
+		CASTVisitorSrcMethodsPrepare castVisitorPrepare = new CASTVisitorSrcMethodsPrepare();
 		castVisitorPrepare.traverse(compileUnits);
 		//函数修改变量的信息
 		HashMap<String, MethodInformation> changeMethods = castVisitorPrepare.getChangeMethods();
 		// 2.将函数调用引起变量改变的函数添加进记录表		
 		int times = 1;     //迭代次数
-		CASTVisitorCheck castVisitorCheck = new CASTVisitorCheck(changeMethods);
+		CASTVisitorSrcMethodsCheck castVisitorCheck = new CASTVisitorSrcMethodsCheck(changeMethods);
 		do {
 			castVisitorCheck.traverse(compileUnits);    //处理函数信息
 			System.out.println("The "+(times++)+"  time");
@@ -378,6 +392,32 @@ public class CASTParser {
 		System.out.flush();
 	}
 	
+	public void interruptParser(ArrayList<CompileUnit> compileUnits) {
+		System.out.println(threadMethodMapTable);
+		CASTVisitorInterrupt castVisitorInterrupt = new CASTVisitorInterrupt(threadMethodMapTable, threadsInfo, threadVarHashMap);
+		castVisitorInterrupt.traverse(compileUnits);
+		
+		Set<ThreadInterruptNode> threadInterruptNodes = castVisitorInterrupt.getThreadInterruptNodes();
+		//中断通知节点
+		for (ThreadInterruptNode threadInterruptNode : threadInterruptNodes) {
+			ArrayList<String> threads = threadInterruptNode.getThreadKeyList();
+			for (String thread : threads) {
+				System.out.println("THREAD: "+thread);
+				Set<Node> nodes = threadsInfo.get(thread).getInterruptNodes();
+				//中断接受节点
+				for (Node node : nodes) {
+					System.out.println("___________________________THREADINTERRUPT______________________________");
+					System.out.println("FROM:");
+					System.out.println("FILE:"+threadInterruptNode.getFileName());
+					System.out.println("LINE:"+threadInterruptNode.getLineNumber());
+					System.out.println("TO:");
+					System.out.println("FILE:"+node.getFileName());
+					System.out.println("LINE:"+node.getLineNumber());
+					System.out.println("___________________________THREADINTERRUPT______________________________");
+				}
+			}
+		}
+	}
 	/**
 	 * java源码函数解析，用于提取会改变调用对象或参数的函数
 	 * @param compileUnits

@@ -226,21 +226,9 @@ public class CASTVisitorTrigger extends ASTVisitor {
 	 * @param node    ：函数调用节点
 	 */
 	private void acquireTriggerInfo(ASTNode astNode,MethodInvocation node) {
-		//1.Thread对象的函数调用astNode.start()  或者   invoke(astNode...)
-		if(astNode instanceof SimpleName) {        
-			SimpleName simpleName = (SimpleName) astNode;
-			if (isThreadRelate(simpleName.resolveTypeBinding())) { 									//确保调用对象线程相关		
-				ASTNode decAstNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding()); 
-				int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-				int decLineNumber = compilationUnit.getLineNumber(decAstNode.getStartPosition());
-				String typeName = simpleName.resolveTypeBinding().getName();
-				String varName = simpleName.getIdentifier().toString();
-				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
-				threadTriggerNodes.add(threadTiggerNode);
-			}
-		}
-		//2.匿名类的调用new Thread(){}.start()
-		else if(astNode instanceof ClassInstanceCreation){  
+
+		//1.匿名类的调用new Thread(){}.start()
+		if(astNode instanceof ClassInstanceCreation){  
 			ClassInstanceCreation classInstanceCreation = (ClassInstanceCreation) astNode;
 			if (isThreadRelate(classInstanceCreation.getType().resolveBinding())) { 				///确保调用对象线程相关	
 				int lineNumber = compilationUnit.getLineNumber(node.getName().getStartPosition());  //函数调用处
@@ -249,6 +237,26 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				String varName = classInstanceCreation.resolveTypeBinding().getBinaryName();
 				ThreadTriggerNode threadTriggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
 				threadTriggerNodes.add(threadTriggerNode);
+			}
+		}
+		//2.Thread对象的函数调用astNode.start()  或者   invoke(astNode...)
+		if(isThreadRelate(CASTHelper.getInstance().getResolveTypeBinding(astNode))) {      //确保调用对象线程相关	
+			int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
+			//变量考虑多态处理
+			if (astNode instanceof SimpleName) {
+				SimpleName simpleName = (SimpleName)astNode;
+				ASTNode decAstNode = compilationUnit.findDeclaringNode(simpleName.resolveBinding()); 			
+				int decLineNumber = compilationUnit.getLineNumber(decAstNode.getStartPosition());
+				String typeName = simpleName.resolveTypeBinding().getName();
+				String varName = simpleName.getIdentifier().toString();
+				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
+				threadTriggerNodes.add(threadTiggerNode);
+			}
+			//函数返回值等，直接考虑得到的类型
+			else {
+				ITypeBinding iTypeBinding = CASTHelper.getInstance().getResolveTypeBinding(astNode);
+				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, iTypeBinding.getBinaryName());
+				threadTriggerNodes.add(threadTiggerNode);
 			}
 		}
 	}

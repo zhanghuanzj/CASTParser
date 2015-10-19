@@ -27,7 +27,7 @@ public class MDG {
 		System.out.println("Begin parser");
 		//所需构建依赖图的源码工程路径设置
 		/********************************************************************/
-		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase01");
+		MDG mdg = new MDG("H:\\Projects\\TestCase\\src\\com\\TestCase05");
 		/********************************************************************/
 		mdg.handleAst();
 		System.out.println("finish");
