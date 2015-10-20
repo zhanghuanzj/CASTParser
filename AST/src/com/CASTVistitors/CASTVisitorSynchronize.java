@@ -61,8 +61,6 @@ public class CASTVisitorSynchronize extends ASTVisitor {
 		} while (parent != compilationUnit);
 		return className;
 	}
-	
-	
 
 	
 	/**

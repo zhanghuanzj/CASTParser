@@ -141,6 +141,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		synMethodSet.add("invokeAll");
 		synMethodSet.add("invokeAny");
 		synMethodSet.add("submit");
+		synMethodSet.add("start");
 	}
 	
 
@@ -151,7 +152,11 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		this.threadInfo = threadInfo;
 	}
 
-	// 获取节点所在函数的KEY
+	/**
+	 *  获取节点所在函数的KEY
+	 * @param node 普通节点
+	 * @return 所在函数的key
+	 */
 	public String methodKey(ASTNode node) {	
 		//获取所在         < 函数名+参数列表>   （为了区分重载情况）
 		ASTNode pNode = node.getParent() ;
@@ -209,7 +214,11 @@ public class CASTVisitorCommunication extends ASTVisitor{
 	}
 
 	
-	//将函数的KEY转换为javaMethodsInfo的KEY
+	/**
+	 * 将函数的KEY转换为javaMethodsInfo的KEY
+	 * @param key
+	 * @return
+	 */
 	public String switchToJavaMethodKey(String key) {
 		if (key==null) {
 			return null;
@@ -220,7 +229,12 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		}
 		return null;
 	}
-	//将函数的KEY转换为sourceMethodsInfo的KEY
+	
+	/**
+	 * 将函数的KEY转换为sourceMethodsInfo的KEY
+	 * @param key
+	 * @return
+	 */
 	public String switchToSrcMethodKey(String key) {
 		if (key==null) {
 			return null;
@@ -231,7 +245,11 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		}
 		return null;
 	}
-	//通过函数的KEY经过转换得到相应的MethodInformation
+	/**
+	 * 通过函数的KEY经过转换得到相应的MethodInformation
+	 * @param key
+	 * @return methodInfo
+	 */
 	public MethodInformation getMethodInformation(String key) {
 		MethodInformation methodInformation = null;
 		if (switchToJavaMethodKey(key)!=null) {
@@ -259,7 +277,11 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		}
 		return false;
 	}
-	//对相关变量的def，use判断(use:false,def:true)
+	/**
+	 * 对相关变量的def，use判断(use:false,def:true)
+	 * @param node
+	 * @return boolean
+	 */
 	public boolean isDefinExpression(SimpleName node) {
 		for(ASTNode pNode = node;pNode!=compilationUnit;pNode=pNode.getParent()){
 			//1.前缀表达式
@@ -337,18 +359,24 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		}
 		return false;
 	}
-	//函数调用记录处理
+	/**
+	 * 记录线程调用的函数
+	 * @param node
+	 * @param threadKey
+	 */
 	public void methodRecord(SimpleName node,String threadKey) {
 		ASTNode pNode = node.getParent();
 		while(pNode!=compilationUnit){
 			if (pNode instanceof MethodInvocation) {
 				String methodKey = castHelper.getInvokeMethodKey(pNode);
+				System.out.println("MethodInvocation:"+pNode);
+				System.out.println("MethodKey:"+methodKey);
 				if (methodKey==null) {
 					return;
 				}
 				//调用函数为工程中的函数,且还未加入线程函数表
 				if (!threadMethodMapTable.containsKey(methodKey)&&
-					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					!javaMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
 					HashSet<String> threadSet = new HashSet<>();
 					threadSet.add(threadKey);
 					threadMethodMapTable.put(methodKey, threadSet);
@@ -356,7 +384,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				}
 				//调用函数为工程中的函数,且已经加入线程函数表
 				else if (threadMethodMapTable.containsKey(methodKey)&&
-						sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+						!javaMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
 					//还未将与函数相关的线程加入hashset
 					if (!threadMethodMapTable.get(methodKey).contains(threadKey)) {
 						threadMethodMapTable.get(methodKey).add(threadKey);
@@ -371,7 +399,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				}
 				//调用函数为工程中的函数,且还未加入线程函数表
 				if (!threadMethodMapTable.containsKey(methodKey)&&
-					sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+					!javaMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
 					HashSet<String> threadSet = new HashSet<>();
 					threadSet.add(threadKey);
 					threadMethodMapTable.put(methodKey, threadSet);
@@ -379,7 +407,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 				}
 				//调用函数为工程中的函数,且已经加入线程函数表
 				else if (threadMethodMapTable.containsKey(methodKey)&&
-						sourceMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
+						!javaMethodsMapTable.containsKey(methodKey.substring(0, methodKey.indexOf('_')))) {
 					//还未将与函数相关的线程加入hashset
 					if (!threadMethodMapTable.get(methodKey).contains(threadKey)) {
 						threadMethodMapTable.get(methodKey).add(threadKey);
@@ -407,12 +435,6 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			ASTNode astNode = castHelper.getVarFullName(node);
 			//从全名中获取核心 var.a.c 中的var
 			SimpleName keyVarName = (SimpleName) castHelper.getLeftVarName(astNode);
-
-/*			System.out.println(filePath);
-			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
-			System.out.println("源变量名："+node.getIdentifier());
-			System.out.println("中间全名："+astNode);
-			System.out.println("真变量名："+keyVarName);*/
 
 			if (keyVarName==null||!node.getIdentifier().equals(keyVarName.getIdentifier())) {
 				System.out.println("不相同");
@@ -450,18 +472,7 @@ public class CASTVisitorCommunication extends ASTVisitor{
 			}
 			//判断是属于Def集还是Use集
 			boolean isDefVar ;
-			System.out.println("NODE2:"+keyVarName);
 			isDefVar = isDefinExpression(keyVarName);
-			System.out.println("Beg____________________________________________________");
-			System.out.println(filePath);
-			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
-			System.out.println("NODE:"+node);
-			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
-			System.out.println("Type_Name :"+((IVariableBinding)node.resolveBinding()).getType().getQualifiedName());
-			System.out.println(declarePosition);
-			System.out.println("is def: "+isDefVar);
-			System.out.println("simpleName:"+keyVarName);
-			System.out.println("End____________________________________________________");
 			//信息提取<(包+类_行号_变量名),(行号、类型、路径)>
 			ThreadInformation threadInformation = threadInfo.get(threadKey);
 			int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
@@ -492,9 +503,6 @@ public class CASTVisitorCommunication extends ASTVisitor{
 		return super.visit(node);	
 	}
 
-	
-	
-	
 	
 	public boolean isUpdate() {
 		return isUpdate;

@@ -45,12 +45,22 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 		this.threadInterruptNodes = new HashSet<>();
 	}
 
-
-	public void interruptNodeHandle(MethodInvocation node,ThreadInterruptNode threadInterruptNode) {
+	/**
+	 * 中断通知节点
+	 * @param node ：函数调用
+	 * @param threadInterruptNode ：中断节点类
+	 */
+	public void interruptNotifyNodeHandle(MethodInvocation node,ThreadInterruptNode threadInterruptNode) {
 		String threadKey;
 		Expression expression = node.getExpression();
 		ITypeBinding iTypeBinding = castHelper.getResolveTypeBinding(expression);
-		//普通变量
+		if (expression==null||iTypeBinding==null) {
+			System.out.println(filePath);
+			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
+			System.out.println("interrupt iTypeBinding error!");
+			return;
+		}
+		//普通变量，从变量集中获取线程key
 		if (expression instanceof SimpleName&&((SimpleName)expression).resolveBinding()!=null) {
 			SimpleName simpleName = (SimpleName)expression;
 			
@@ -67,10 +77,54 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 				System.out.println("ERROR: didn't contains the varKey");
 			}
 		}
-		//其它调用
+		//其它调用(函数返回值等)：直接从返回值类型推断具体线程key
 		else{
 			threadKey = iTypeBinding.getBinaryName();
 			threadInterruptNode.getThreadKeyList().add(threadKey);
+		}
+	}
+	
+	/**
+	 * 中断接受节点
+	 * @param node ： 函数调用
+	 */
+	public void interruptAcceptNodeHandle(MethodInvocation node) {
+		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
+		Node interruptedNode = new Node(filePath, lineNumber);
+		String threadKey;
+		Expression expression = node.getExpression();
+		ITypeBinding iTypeBinding = castHelper.getResolveTypeBinding(expression);
+		if (expression==null||iTypeBinding==null) {
+			System.out.println(filePath);
+			System.out.println(compilationUnit.getLineNumber(node.getStartPosition()));
+			System.out.println("interrupt iTypeBinding error!");
+			return;
+		}
+		//普通变量
+		if (expression instanceof SimpleName&&((SimpleName)expression).resolveBinding()!=null) {
+			SimpleName simpleName = (SimpleName)expression;
+			if (castHelper.getDecNode(simpleName)==null) {
+				return;
+			}
+			int decLineNumber = compilationUnit.getLineNumber(castHelper.getDecNode(simpleName).getStartPosition());
+			String varKey = filePath+"_"+decLineNumber+"_"+iTypeBinding.getName()+"_"+simpleName.getIdentifier();
+			System.out.println(varKey);
+			if (threadVarHashMap.containsKey(varKey)) {
+				threadKey = threadVarHashMap.get(varKey).getThreadInfoKey();
+				if (threadInfo.get(threadKey).getInterruptNodes()!=null) {
+					threadInfo.get(threadKey).getInterruptNodes().add(interruptedNode);
+				}
+			}
+			else {
+				System.out.println("ERROR: didn't contains the varKey");
+			}
+		}
+		//其它调用
+		else if(((SimpleName)expression).resolveBinding()!=null){
+			threadKey = iTypeBinding.getBinaryName();
+			if (threadInfo.get(threadKey).getInterruptNodes()!=null) {
+				threadInfo.get(threadKey).getInterruptNodes().add(interruptedNode);
+			}		
 		}
 	}
 	
@@ -79,7 +133,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 		String methodKey = castHelper.methodKey(node);
 		String methodName = node.getName().toString();
 		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-		//函数调用在线程调用到的函数中
+		//函数调用在线程调用到的函数中(单个函数可能牵扯到多个线程)
 		if (threadMethodMapTable.containsKey(methodKey)&&node.resolveMethodBinding()!=null) {
 			IMethodBinding iMethodBinding = node.resolveMethodBinding();
 			//1.中断判断函数(中断接受节点)
@@ -88,12 +142,14 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 					System.out.println(node);
 					System.out.println("interrupted judge");
 					HashSet<String>threads = threadMethodMapTable.get(methodKey);
-					//添加到每个线程的中断接受节点集合
+					//(1)添加到每个线程的中断接受节点集合
 					for (String thread : threads) {
 						ThreadInformation threadInformation = threadInfo.get(thread);
 						Node interruptedNode = new Node(filePath, lineNumber);
 						threadInformation.getInterruptNodes().add(interruptedNode);
 					}
+					//(2)变量自身判断(根据自己所绑定的线程类型而添加中断接受节点)
+					interruptAcceptNodeHandle(node);
 				}
 			}
 			//2.引发中断的函数调用(中断通知节点)
@@ -111,7 +167,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 				}
 				//(2)调用中断,通过变量来定位threadKey
 				else if (iMethodBinding.getDeclaringClass()!=null&&iMethodBinding.getDeclaringClass().getBinaryName().equals("java.lang.Thread")) {
-					interruptNodeHandle(node,threadInterruptNode);
+					interruptNotifyNodeHandle(node,threadInterruptNode);
 				}
 			}
 			//3.会抛出中断异常的函数(中断接受节点)
@@ -122,12 +178,14 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 						System.out.println(node);
 						System.out.println("interrupted exception");
 						HashSet<String>threads = threadMethodMapTable.get(methodKey);
-						//添加到每个线程的中断接受节点集合
+						//(1)添加到每个线程的中断接受节点集合
 						for (String thread : threads) {
 							ThreadInformation threadInformation = threadInfo.get(thread);
 							Node interruptedNode = new Node(filePath, lineNumber);
 							threadInformation.getInterruptNodes().add(interruptedNode);
 						}
+						//(2)变量自身判断(根据自己所绑定的线程类型而添加中断接受节点)
+						interruptAcceptNodeHandle(node);
 					}
 				}
 			}

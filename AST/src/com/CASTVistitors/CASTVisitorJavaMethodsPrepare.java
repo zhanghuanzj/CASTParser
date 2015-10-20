@@ -52,7 +52,11 @@ public class CASTVisitorJavaMethodsPrepare extends ASTVisitor {
 		changeMethods = new HashMap<>();
 	}
 
-	//返回参数所在函数的参数列表中的index 从0开始
+	/**
+	 * 返回参数所在函数的参数列表中的index 从0开始
+	 * @param node 参数变量声明
+	 * @return 参数所在的索引
+	 */
 	public int getParaIndex(SingleVariableDeclaration node) {
 		if (node.getParent() instanceof MethodDeclaration) {
 			MethodDeclaration methodDeclaration = (MethodDeclaration) node.getParent();

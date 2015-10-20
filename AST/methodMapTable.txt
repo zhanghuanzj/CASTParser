@@ -1,2 +1,0 @@
-com.TestCase01
-0

@@ -85,9 +85,9 @@ public class CASTParser {
 		triggerParser(compileUnits);                 //1.线程触发边解析
 		bindThreadRel();							 //相关线程绑定
 //		synchronizeParser(compileUnits);			 //2.同步依赖解析
-//		communicationParserPre(compileUnits);
-//		System.out.println("FIRST FINISH");
-//		communicatinoParserPost(compileUnits);       //3.通信依赖解析
+		communicationParserPre(compileUnits);
+		System.out.println("FIRST FINISH");
+		communicatinoParserPost(compileUnits);       //3.通信依赖解析
 		interruptParser(compileUnits);
 //		javaSrcMethod(compileUnits);                 //java源码函数解析
 		
@@ -210,7 +210,7 @@ public class CASTParser {
 	}
 	
 	/**
-	 * 线程通信依赖解析--函数信息获取
+	 * 线程通信依赖解析--函数信息获取(对于每个函数都建立一个线程集)
 	 * @param compileUnits ：编译单元列表
 	 */
 	public void communicationParserPre(ArrayList<CompileUnit> compileUnits) {
@@ -343,8 +343,8 @@ public class CASTParser {
 		}
 		Set<Map.Entry<String, HashSet<String>>> methodSet = threadMethodMapTable.entrySet();
 		for (Entry<String, HashSet<String>> entry : methodSet) {
-			System.out.println(entry.getKey());
-			System.out.println(entry.getValue());
+			System.out.println("Method:"+entry.getKey());
+			System.out.println("Thread:"+entry.getValue());
 		}
 		System.out.println(threadRelate);
 		for (Entry<String, ThreadInformation> thread1 : threadInfomations) {
