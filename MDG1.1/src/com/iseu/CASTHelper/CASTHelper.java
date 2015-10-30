@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,8 +37,7 @@ import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import com.iseu.Information.DeclarePosition;
 
 public class CASTHelper {
-	HashSet<String> varType = new HashSet<>();
-	double []a;
+	private HashSet<String> varType = new HashSet<>();
 	private final static CASTHelper CAST_HELPER = new CASTHelper();
 	private CASTHelper() {	
 		varType.add("String");

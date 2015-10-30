@@ -89,10 +89,10 @@ public class CASTParser {
 		//MDG依赖边的解析与获取
 		triggerParser(compileUnits);                 //1.线程触发边解析
 		System.out.println(threadToIntegerMap);
-		communicationParserPre(compileUnits);        //3.1通信依赖初步，改变对象函数的提取
+		communicationParserPre(compileUnits);        //2.1通信依赖初步，改变对象函数的提取
 		System.out.println("FIRST FINISH");
-		communicatinoParserPost(compileUnits);       //3.2通信依赖解析，函数线程表及def&use
-//		synchronizeParser(compileUnits);			 //2.同步依赖解析
+		communicatinoParserPost(compileUnits);       //2.2通信依赖解析，函数线程表及def&use
+//		synchronizeParser(compileUnits);			 //3.同步依赖解析
 
 //		interruptParser(compileUnits);               //4.中断依赖
 //		otherDependenceAnalyse(compileUnits);        //5.其余依赖解析
