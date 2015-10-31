@@ -74,26 +74,26 @@ public class CASTVisitorSynchronize extends ASTVisitor {
 		if (methodName.equals("notify")||methodName.equals("notifyAll")||
 			methodName.equals("signal")||methodName.equals("signalAll")||methodName.equals("countDown")) {
 			if (node.getExpression()==null) {
-				ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,acquireTheClass(node));
+				ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,acquireTheClass(node));
 				threadNotifyNodes.add(threadNotifyNode);
 			}
 			else {
 				String objectTypeName = CASTHelper.getInstance().getObjectName(node.getExpression());
 				if (objectTypeName!=null) {
-					ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,objectTypeName);
+					ThreadNotifyNode threadNotifyNode = new ThreadNotifyNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, acquireTheClass(node), NotifyType.NOTIFY,objectTypeName);
 					threadNotifyNodes.add(threadNotifyNode);
 				}
 			}
 		}
 		else if(methodName.equals("wait")||methodName.equals("await")) {
 			if (node.getExpression()==null) {
-				ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,acquireTheClass(node));
+				ThreadWaitNode threadWaitNode = new ThreadWaitNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,acquireTheClass(node));
 				threadWaitNodes.add(threadWaitNode);
 			}
 			else {
 				String objectTypeName = CASTHelper.getInstance().getObjectName(node.getExpression());
 				if (objectTypeName!=null) {
-					ThreadWaitNode threadWaitNode = new ThreadWaitNode(filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,objectTypeName);
+					ThreadWaitNode threadWaitNode = new ThreadWaitNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, acquireTheClass(node), WaitType.WAIT,objectTypeName);
 					threadWaitNodes.add(threadWaitNode);
 				}
 			}

@@ -6,9 +6,9 @@ public class ThreadNotifyNode extends Node{
 	private String objectTypeName;
 
 
-	public ThreadNotifyNode(String fileName, int lineNumber, String className, NotifyType notifyType,
+	public ThreadNotifyNode(String methodName,String fileName, int lineNumber, String className, NotifyType notifyType,
 			 String objectTypeName) {
-		super(fileName, lineNumber);
+		super(methodName,fileName, lineNumber);
 		this.className = className;
 		this.notifyType = notifyType;
 		this.objectTypeName = objectTypeName;

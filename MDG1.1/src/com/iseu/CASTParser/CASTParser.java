@@ -25,6 +25,7 @@ import java.util.TreeSet;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.SynchronizedStatement;
 
+import com.iseu.CASTStorage.CASTStorage;
 import com.iseu.CASTVistitors.CASTVisitorCommunication;
 import com.iseu.CASTVistitors.CASTVisitorInterrupt;
 import com.iseu.CASTVistitors.CASTVisitorJavaMethodsCheck;
@@ -46,9 +47,13 @@ import com.iseu.MDGHandle.Nodes.ThreadNotifyNode;
 import com.iseu.MDGHandle.Nodes.ThreadTriggerNode;
 import com.iseu.MDGHandle.Nodes.ThreadWaitNode;
 
+import storage.DGEdge;
+import storage.NEO4JAccess;
+
 
 
 public class CASTParser {
+	String DBpath;
 	private String projectPath;
 	private ArrayList<String> filePathList;
 	private HashMap<String, ThreadInformation> threadsInfo;   //线程信息表
@@ -63,8 +68,9 @@ public class CASTParser {
 	private Set<String> threadRelate;                 		  //线程相关记录
 	private ArrayList<ThreadTriggerNode> threadTriggerNodes;  //线程触发节点列表
 	//构造函数
-	public CASTParser(String projectPath) {
+	public CASTParser(String projectPath,String DBpath) {
 		this.projectPath = projectPath;
+		this.DBpath = DBpath; 
 		filePathList = new ArrayList<>();
 		threadsInfo = new HashMap<>();	
 		threadVarHashMap = new HashMap<>();
@@ -79,6 +85,8 @@ public class CASTParser {
 	 */
 	public void  parser() {
 		System.out.println("parsering");
+		CASTStorage.CreateDataBase(DBpath);
+		
 		//AST树的创建与编译单元组的获取
 		CFileASTRequestor cFileASTRequestor = new CFileASTRequestor();
 		CASTCreater castCreater = new CASTCreater(projectPath,cFileASTRequestor);
@@ -88,10 +96,10 @@ public class CASTParser {
 	
 		//MDG依赖边的解析与获取
 		triggerParser(compileUnits);                 //1.线程触发边解析
-		System.out.println(threadToIntegerMap);
-		communicationParserPre(compileUnits);        //2.1通信依赖初步，改变对象函数的提取
-		System.out.println("FIRST FINISH");
-		communicatinoParserPost(compileUnits);       //2.2通信依赖解析，函数线程表及def&use
+//		System.out.println(threadToIntegerMap);
+//		communicationParserPre(compileUnits);        //2.1通信依赖初步，改变对象函数的提取
+//		System.out.println("FIRST FINISH");
+//		communicatinoParserPost(compileUnits);       //2.2通信依赖解析，函数线程表及def&use
 //		synchronizeParser(compileUnits);			 //3.同步依赖解析
 
 //		interruptParser(compileUnits);               //4.中断依赖
@@ -108,7 +116,7 @@ public class CASTParser {
 		//用于获取线程相关类的信息，线程变量集，线程启动点
 		CASTVisitorTrigger castVisitor = new CASTVisitorTrigger(threadsInfo,threadVarHashMap,threadTriggerNodes,threadMethodMapTable,threadToIntegerMap);
 		castVisitor.traverse(compileUnits);
-		//打印线程类信息
+/*		//打印线程类信息
 		Set<Map.Entry<String, ThreadInformation>> threadInfomations = threadsInfo.entrySet();
 		for (Entry<String, ThreadInformation> entry : threadInfomations) {
 			System.out.println("______________________________THREAD_INFO_HASHMAP____________________________________");
@@ -132,7 +140,7 @@ public class CASTParser {
 			System.out.println(threadTiggerNode);
 			System.out.println("_____________________________TRIGGER_TRIGGER_NODE___________________________________");
 		}
-		
+		*/
 		ArrayList<Edge> edgesList = new ArrayList<>();
 		for (ThreadTriggerNode threadTiggerNode : threadTriggerNodes) {
 			ThreadTriggerNode from = threadTiggerNode;
@@ -159,17 +167,14 @@ public class CASTParser {
 			if (threadInformation!=null) {
 				String filePath = threadInformation.getFilePath();
 				int lineNumber = threadInformation.getStartLineNumber();
-				Node to = new Node(filePath, lineNumber);
-				Edge threadStartEdge = new Edge(from, to, ThreadEdgeType.THREADTRIGGER);
-				edgesList.add(threadStartEdge);
+				//获取两节点的数据库ID
+				long fromNodeID = CASTStorage.getTriggerNodeID(from.getFileName(), from.getMethodName(), from.getLineNumber());
+				long toNodeID = CASTStorage.getMethodID(filePath, lineNumber);
+//				System.out.println("FROM:"+fromNodeID);
+//				System.out.println("TO:"+toNodeID);
+				//将边的信息存入
+				CASTStorage.store(fromNodeID, toNodeID, DGEdge.threadStart);
 			}
-		}
-		System.out.println("Total trigger edge is:"+edgesList.size());
-		//打印边
-		for (Edge edge : edgesList) {
-			System.out.println("______________________________________TRIGGER_______________________________________");
-			System.out.println(edge);
-			System.out.println("______________________________________TRIGGER_______________________________________");
 		}
 	}
 
@@ -189,7 +194,7 @@ public class CASTParser {
 			System.out.println(threadWaitNode);
 		}
 		ArrayList<Edge> edges = new ArrayList<>();
-		for (ThreadNotifyNode threadNotifyNode : threadNotifyNodes) {
+/*		for (ThreadNotifyNode threadNotifyNode : threadNotifyNodes) {
 			for (ThreadWaitNode threadWaitNode : threadWaitNodes) {
 				//1.属于同一个类中且对象类型相同
 				if(threadNotifyNode.getFileName().equals(threadWaitNode.getFileName())&&
@@ -208,7 +213,7 @@ public class CASTParser {
 					edges.add(edge);
 				}
 			}
-		}
+		}*/
 		for (Edge edge : edges) {
 			System.out.println("______________________________________SYND_______________________________________");
 			System.out.println(edge);

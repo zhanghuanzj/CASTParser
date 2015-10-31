@@ -33,6 +33,7 @@ import org.eclipse.jdt.core.dom.TypeDeclaration;
 import org.eclipse.jdt.core.dom.VariableDeclarationExpression;
 import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
+import org.neo4j.cypher.internal.compiler.v2_0.functions.Str;
 
 import com.iseu.Information.DeclarePosition;
 
@@ -375,7 +376,26 @@ public class CASTHelper {
 		}
 		return false;
 	}
-	// 获取Node所在函数的KEY
+	/**
+	 * 获取语句所在函数的函数名
+	 * @param node
+	 * @return
+	 */
+	public String getMethodName(ASTNode node) {
+		ASTNode root = node.getRoot();
+		for(ASTNode astNode = node;astNode!=root;astNode = astNode.getParent()){
+			if (astNode instanceof MethodDeclaration) {
+				MethodDeclaration methodDeclaration = (MethodDeclaration) astNode;
+				return methodDeclaration.getName().getIdentifier();
+			}
+		}
+		return null;
+	}
+	/**
+	 *  获取Node所在函数的KEY
+	 * @param node
+	 * @return
+	 */
 	public String methodKey(ASTNode node) {	
 		if (node==null) {
 			return null;

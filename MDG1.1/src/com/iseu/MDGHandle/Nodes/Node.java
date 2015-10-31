@@ -1,6 +1,7 @@
 package com.iseu.MDGHandle.Nodes;
 
 public class Node {
+	private String methodName;
 	private String fileName;
 	private int lineNumber;
 
@@ -17,7 +18,16 @@ public class Node {
 		this.lineNumber = lineNumber;
 	}
 	
-	public Node(String fileName, int lineNumber) {
+	public String getMethodName() {
+		return methodName;
+	}
+	public void setMethodName(String methodName) {
+		this.methodName = methodName;
+	}
+
+	public Node(String methodName, String fileName, int lineNumber) {
+		super();
+		this.methodName = methodName;
 		this.fileName = fileName;
 		this.lineNumber = lineNumber;
 	}

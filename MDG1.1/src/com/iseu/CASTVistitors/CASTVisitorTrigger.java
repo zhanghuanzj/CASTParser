@@ -276,7 +276,7 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				int decLineNumber = compilationUnit.getLineNumber(classInstanceCreation.getStartPosition()); //匿名对象声明处
 				String typeName = classInstanceCreation.getType().toString();
 				String varName = classInstanceCreation.resolveTypeBinding().getBinaryName();
-				ThreadTriggerNode threadTriggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
+				ThreadTriggerNode threadTriggerNode = new ThreadTriggerNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
 				threadTriggerNodes.add(threadTriggerNode);
 			}
 		}
@@ -293,13 +293,13 @@ public class CASTVisitorTrigger extends ASTVisitor {
 				int decLineNumber = compilationUnit.getLineNumber(decAstNode.getStartPosition());
 				String typeName = simpleName.resolveTypeBinding().getName();
 				String varName = simpleName.getIdentifier().toString();
-				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
+				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, filePath+"_"+decLineNumber+"_"+typeName+"_"+varName);
 				threadTriggerNodes.add(threadTiggerNode);
 			}
 			//函数返回值等，直接考虑得到的类型
 			else {
 				ITypeBinding iTypeBinding = CASTHelper.getInstance().getResolveTypeBinding(astNode);
-				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(filePath, lineNumber, iTypeBinding.getBinaryName());
+				ThreadTriggerNode threadTiggerNode = new ThreadTriggerNode(CASTHelper.getInstance().getMethodName(node),filePath, lineNumber, iTypeBinding.getBinaryName());
 				threadTriggerNodes.add(threadTiggerNode);
 			}
 		}

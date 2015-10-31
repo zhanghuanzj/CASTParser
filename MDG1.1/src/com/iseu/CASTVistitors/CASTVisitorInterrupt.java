@@ -90,7 +90,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 	 */
 	public void interruptAcceptNodeHandle(MethodInvocation node) {
 		int lineNumber = compilationUnit.getLineNumber(node.getStartPosition());
-		Node interruptedNode = new Node(filePath, lineNumber);
+		Node interruptedNode = new Node(castHelper.getMethodName(node),filePath, lineNumber);
 		String threadKey;
 		Expression expression = node.getExpression();
 		ITypeBinding iTypeBinding = castHelper.getResolveTypeBinding(expression);
@@ -145,7 +145,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 					//(1)添加到每个线程的中断接受节点集合
 					for (String thread : threads) {
 						ThreadInformation threadInformation = threadInfo.get(thread);
-						Node interruptedNode = new Node(filePath, lineNumber);
+						Node interruptedNode = new Node(castHelper.getMethodName(node),filePath, lineNumber);
 						threadInformation.getInterruptNodes().add(interruptedNode);
 					}
 					//(2)变量自身判断(根据自己所绑定的线程类型而添加中断接受节点)
@@ -154,7 +154,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 			}
 			//2.引发中断的函数调用(中断通知节点)
 			else if (methodName.equals("interrupt")) {
-				ThreadInterruptNode threadInterruptNode = new ThreadInterruptNode(filePath, lineNumber);
+				ThreadInterruptNode threadInterruptNode = new ThreadInterruptNode(castHelper.getMethodName(node),filePath, lineNumber);
 				//(1)自中断
 				if (node.getExpression() instanceof MethodInvocation&&
 					((MethodInvocation) node.getExpression()).getName().getIdentifier().equals("currentThread")) {	
@@ -181,7 +181,7 @@ public class CASTVisitorInterrupt extends ASTVisitor{
 						//(1)添加到每个线程的中断接受节点集合
 						for (String thread : threads) {
 							ThreadInformation threadInformation = threadInfo.get(thread);
-							Node interruptedNode = new Node(filePath, lineNumber);
+							Node interruptedNode = new Node(castHelper.getMethodName(node),filePath, lineNumber);
 							threadInformation.getInterruptNodes().add(interruptedNode);
 						}
 						//(2)变量自身判断(根据自己所绑定的线程类型而添加中断接受节点)

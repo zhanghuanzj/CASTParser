@@ -6,9 +6,9 @@ public class ThreadWaitNode extends Node{
 	private String objectTypeName;
 
 
-	public ThreadWaitNode(String fileName, int lineNumber, String className, WaitType waitType,
+	public ThreadWaitNode(String methodName,String fileName, int lineNumber, String className, WaitType waitType,
 		   String objectTypeName) {
-		super(fileName, lineNumber);
+		super(methodName,fileName, lineNumber);
 		this.className = className;
 		this.waitType = waitType;
 		this.objectTypeName = objectTypeName;

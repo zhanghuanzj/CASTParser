@@ -7,8 +7,8 @@ import java.util.Set;
 public class ThreadInterruptNode extends Node{
 	ArrayList<String> threadKeySet ;
 	
-	public ThreadInterruptNode(String fileName, int lineNumber) {
-		super(fileName, lineNumber);
+	public ThreadInterruptNode(String methodName,String fileName, int lineNumber) {
+		super(methodName,fileName, lineNumber);
 		this.threadKeySet = new ArrayList<>();
 	}
 
