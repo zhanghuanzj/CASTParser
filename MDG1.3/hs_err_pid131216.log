@@ -1,0 +1,135 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 5595136 bytes for object start array expansion
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   In 32 bit mode, the process size limit was hit
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Use 64 bit Java on a 64 bit OS
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (objectStartArray.cpp:102), pid=131216, tid=139696
+#
+# JRE version:  (8.0_45-b14) (build )
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (25.45-b02 mixed mode windows-amd64 compressed oops)
+# Failed to write core dump. Minidumps are not enabled by default on client versions of Windows
+#
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x0000000001cee800):  JavaThread "Unknown thread" [_thread_in_vm, id=139696, stack(0x00000000023b0000,0x00000000024b0000)]
+
+Stack: [0x00000000023b0000,0x00000000024b0000]
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [jvm.dll+0x32b57a]
+V  [jvm.dll+0x279873]
+V  [jvm.dll+0x27a509]
+V  [jvm.dll+0x271825]
+V  [jvm.dll+0x3ea6de]
+V  [jvm.dll+0x3f294c]
+V  [jvm.dll+0x3f2e88]
+V  [jvm.dll+0x3e6fc9]
+V  [jvm.dll+0x3eb378]
+V  [jvm.dll+0xf1207]
+V  [jvm.dll+0xf1b64]
+V  [jvm.dll+0x20f057]
+V  [jvm.dll+0x240e0a]
+V  [jvm.dll+0x15ba41]
+C  [javaw.exe+0x217e]
+C  [javaw.exe+0xcd17]
+C  [javaw.exe+0xcdab]
+C  [kernel32.dll+0x15a4d]
+C  [ntdll.dll+0x2b831]
+
+
+---------------  P R O C E S S  ---------------
+
+Java Threads: ( => current thread )
+
+Other Threads:
+
+=>0x0000000001cee800 (exited) JavaThread "Unknown thread" [_thread_in_vm, id=139696, stack(0x00000000023b0000,0x00000000024b0000)]
+
+VM state:not at safepoint (not fully initialized)
+
+VM Mutex/Monitor currently owned by a thread: None
+
+GC Heap History (0 events):
+No events
+
+Deoptimization events (0 events):
+No events
+
+Internal exceptions (0 events):
+No events
+
+Events (0 events):
+No events
+
+
+Dynamic libraries:
+0x000000013fa60000 - 0x000000013fa97000 	C:\Program Files\Java\jdk1.8.0_45\bin\javaw.exe
+0x0000000076fa0000 - 0x0000000077149000 	C:\Windows\SYSTEM32\ntdll.dll
+0x0000000076e80000 - 0x0000000076fa0000 	C:\Windows\system32\kernel32.dll
+0x000007fefcb30000 - 0x000007fefcb9c000 	C:\Windows\system32\KERNELBASE.dll
+0x000007fefef70000 - 0x000007feff04b000 	C:\Windows\system32\ADVAPI32.dll
+0x000007fefeda0000 - 0x000007fefee3f000 	C:\Windows\system32\msvcrt.dll
+0x000007fefd970000 - 0x000007fefd98f000 	C:\Windows\SYSTEM32\sechost.dll
+0x000007fefee40000 - 0x000007fefef6d000 	C:\Windows\system32\RPCRT4.dll
+0x0000000076c40000 - 0x0000000076d3a000 	C:\Windows\system32\USER32.dll
+0x000007fefd860000 - 0x000007fefd8c7000 	C:\Windows\system32\GDI32.dll
+0x000007feff120000 - 0x000007feff12e000 	C:\Windows\system32\LPK.dll
+0x000007feff050000 - 0x000007feff119000 	C:\Windows\system32\USP10.dll
+0x000007fefb110000 - 0x000007fefb304000 	C:\Windows\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.7601.18837_none_fa3b1e3d17594757\COMCTL32.dll
+0x000007fefd230000 - 0x000007fefd2a1000 	C:\Windows\system32\SHLWAPI.dll
+0x000007fefd730000 - 0x000007fefd75e000 	C:\Windows\system32\IMM32.DLL
+0x000007fefec80000 - 0x000007fefed89000 	C:\Windows\system32\MSCTF.dll
+0x000000005be20000 - 0x000000005bef2000 	C:\Program Files\Java\jdk1.8.0_45\jre\bin\msvcr100.dll
+0x000000006f5e0000 - 0x000000006fe63000 	C:\Program Files\Java\jdk1.8.0_45\jre\bin\server\jvm.dll
+0x000007fef48a0000 - 0x000007fef48a9000 	C:\Windows\system32\WSOCK32.dll
+0x000007fefcf70000 - 0x000007fefcfbd000 	C:\Windows\system32\WS2_32.dll
+0x000007fefed90000 - 0x000007fefed98000 	C:\Windows\system32\NSI.dll
+0x000007fefcee0000 - 0x000007fefcf1b000 	C:\Windows\system32\WINMM.dll
+0x000007fefbbe0000 - 0x000007fefbbec000 	C:\Windows\system32\VERSION.dll
+0x0000000077160000 - 0x0000000077167000 	C:\Windows\system32\PSAPI.DLL
+0x00000000652c0000 - 0x00000000652cf000 	C:\Program Files\Java\jdk1.8.0_45\jre\bin\verify.dll
+0x00000000628a0000 - 0x00000000628c9000 	C:\Program Files\Java\jdk1.8.0_45\jre\bin\java.dll
+0x0000000062620000 - 0x0000000062636000 	C:\Program Files\Java\jdk1.8.0_45\jre\bin\zip.dll
+0x000007fefa950000 - 0x000007fefaa75000 	C:\Windows\system32\dbghelp.dll
+
+VM Arguments:
+jvm_args: -Xms4G -Xms4G -Dfile.encoding=GBK 
+java_command: com.iseu.MDGHandle.MDG
+java_class_path (initial): H:\Projects\MDG1.3\bin;H:\Projects\MDG1.3\JLS8\neo4j-desktop-2.2.5.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.core.contenttype_3.5.0.v20150421-2214.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.core.jobs_3.7.0.v20150330-2103.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.core.resources.win32.x86_64_3.5.0.v20140124-1940.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.core.resources_3.10.0.v20150423-0755.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.core.runtime_3.11.0.v20150405-1723.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.equinox.common_3.7.0.v20150402-1709.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.equinox.preferences_3.5.300.v20150408-1437.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.jdt.core.manipulation_1.5.100.v20141002-1241.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.jdt.core_3.11.0.v20150602-1242.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.jface_3.4.0.I20080606-1300.jar;H:\Projects\MDG1.3\JLS8\org.eclipse.osgi_3.10.100.v20150529-1857.jar
+Launcher Type: SUN_STANDARD
+
+Environment Variables:
+JAVA_HOME=C:\Program Files\Java\jdk1.8.0_45
+CLASSPATH=.;C:C:\Program Files\Java\jdk1.8.0_45\bin;C:\Program Files\Java\jdk1.8.0_45\jre\bin
+PATH=C:/Program Files/Java/jdk1.8.0_45/bin/../jre/bin/server;C:/Program Files/Java/jdk1.8.0_45/bin/../jre/bin;C:/Program Files/Java/jdk1.8.0_45/bin/../jre/lib/amd64;C:\Python27\Lib\site-packages\PyQt4;C:\Program Files (x86)\Intel\iCLS Client\;C:\Program Files\Intel\iCLS Client\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files (x86)\Intel\OpenCL SDK\3.0\bin\x86;C:\Program Files (x86)\Intel\OpenCL SDK\3.0\bin\x64;C:\Program Files\Microsoft\Web Platform Installer\;C:\Program Files (x86)\Microsoft ASP.NET\ASP.NET Web Pages\v1.0\;C:\Windows\Microsoft.NET\Framework\v2.0.50727\;C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\Bin;C:\Python27;C:\Program Files\Java\jdk1.8.0_45\bin;C:\Program Files\Java\jre1.8.0_45\binC:\Program Files\Java\jre1.8.0_45\bin;C:\Program Files\TortoiseSVN\bin;C:\Program Files (x86)\Calibre2\;;C:\Program Files\Java\jdk1.8.0_45\bin;C:\Program Files\Java\jdk1.8.0_45\jre\bin;H:\eclipseœ¬‘ÿ\eclipse-java-mars-R-win32-x86_64\eclipse;
+USERNAME=Dell
+OS=Windows_NT
+PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 60 Stepping 3, GenuineIntel
+
+
+
+---------------  S Y S T E M  ---------------
+
+OS: Windows 7 , 64 bit Build 7601 (6.1.7601.19045)
+
+CPU:total 8 (4 cores per cpu, 2 threads per core) family 6 model 60 stepping 3, cmov, cx8, fxsr, mmx, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, avx, avx2, aes, clmul, erms, lzcnt, ht, tsc, tscinvbit, bmi1, bmi2
+
+Memory: 4k page, physical 8329368k(2439300k free), swap 23593224k(3065980k free)
+
+vm_info: Java HotSpot(TM) 64-Bit Server VM (25.45-b02) for windows-amd64 JRE (1.8.0_45-b14), built on Apr 10 2015 10:34:15 by "java_re" with MS VC++ 10.0 (VS2010)
+
+time: Wed Dec 09 20:52:43 2015
+elapsed time: 0 seconds (0d 0h 0m 0s)
+

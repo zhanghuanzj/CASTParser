@@ -1,0 +1,16 @@
+com.TestCase01_Consumer_run
+true
+0
+-1
+com.TestCase01_Producer_run
+true
+0
+-1
+com.TestCase01_Storage_produce_i
+true
+0
+-1
+com.TestCase01_Storage_consume_i
+true
+0
+-1

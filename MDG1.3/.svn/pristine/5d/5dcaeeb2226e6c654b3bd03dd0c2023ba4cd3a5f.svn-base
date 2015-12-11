@@ -1,0 +1,544 @@
+package com.iseu.CSlicer;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.eclipse.jdt.core.dom.SynchronizedStatement;
+import org.neo4j.cypher.ExecutionEngine;
+import org.neo4j.cypher.ExtendedExecutionResult;
+import org.neo4j.cypher.internal.compiler.v2_2.PathImpl;
+import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.PropertyContainer;
+import org.neo4j.graphdb.ResourceIterator;
+import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.kernel.impl.util.StringLogger;
+
+import scala.reflect.internal.Symbols.StubClassSymbol;
+import storage.DGEdge;
+import storage.NEO4JAccess;
+
+public class ConcurrentSlicer {
+	public  GraphDatabaseService database = null;
+	public  ExecutionEngine engine;
+	public  String DBpath ;                           //数据库路径
+	public  String SliceStoreRootFilePath;            //工程存储根目录
+	public  HashMap<String, TreeSet<Integer>> slices; //切片集
+	public  HashSet<Long> visitedNodes;               //访问过的节点
+	public  HashSet<Long> currentNodes;               //当前节点
+	public  ArrayList<String> forwardEdges;
+	
+	{
+		String[] fEdges = {"classMember","controlDepd","instantiation","objMember","parameter","typeAnalysis",
+		"dataDepd","inputParameter","outputParameter","methodInvocation","methodImplment","methodOverwrite",
+		"interfaceImplement","inherit","abstractMember","pkgMember","pkgDepd","threadStart",
+		"notify","s_communicate","FutureGet","countDown","theadSecurity","competenceAcquire",
+		"competenceRelease","competenceDepd","m_communicate","mo_communicate","connection",
+		"c_communicate","interClassMessage","anonymousClassDeclare","CFGedge","summaryEdge",
+		"dataMember","toObject","interrupt","threadRisk","authorityAcquire","authorityRelease",};
+		forwardEdges = new ArrayList();
+		for (String string : fEdges) {
+			forwardEdges.add(string);
+		}
+	}
+	/**
+	 * 读取数据库
+	 * @param dataBasePath 数据库的路径
+	 * @return 
+	 */
+	public ConcurrentSlicer(String dataBasePath,String rootFilePath) {
+		SliceStoreRootFilePath = rootFilePath;                            //切片存储根路径
+		DBpath = dataBasePath;                                            //路径设置
+		database = new GraphDatabaseFactory().newEmbeddedDatabase(DBpath);//数据库创建或读取
+		registerShutdownHook(database);                                
+		engine = new ExecutionEngine(database,StringLogger.logger(new File("log"))); //查询引擎创建
+		slices = new HashMap<>();
+		visitedNodes = new HashSet<>();
+		currentNodes = new HashSet<>();
+	}
+	
+	private void registerShutdownHook(final GraphDatabaseService graphDb) {
+		// Registers a shutdown hook for the Neo4j instance so that it
+		// shuts down nicely when the VM exits (even if you "Ctrl-C" the
+		// running application).
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				graphDb.shutdown();
+			}
+		});
+	}
+	
+	public Node getNode(Long nodeID) {
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query = "START n=NODE("+nodeID+") return n";
+			//获取查询结果
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Can not find the statnode");
+				return null;
+			}
+			//获取node列
+			ResourceIterator<Node> nodes = result.javaColumnAs("n");
+			if(nodes.hasNext()){
+				Node node = nodes.next();
+				transaction.success();
+				return node;
+			}
+		}	
+		finally {
+			transaction.close();
+		}
+		return null;
+	}
+
+	/**
+	 * 静态切片核心函数1：Θ(node)
+	 * 记录一条语句所在的线程，可能被多个线程执行
+	 * @param node     ：语句节点
+	 * @param threads  ：线程集(用于存储线程名)
+	 */
+	public void threadName(Node node,HashSet<Node> threads) {
+		if (node.hasProperty("MethodID")) {
+			//获取语句所在函数节点
+			Node methodNode = getNode(Long.valueOf((String) node.getProperty("MethodID")));
+			String methodName = (String) methodNode.getProperty("Name");
+			//若为线程函数
+			if (methodName.equals("run")||methodName.equals("compute")||methodName.equals("call")||methodName.equals("main")) {
+				Node classNode = getNode(Long.valueOf((String) methodNode.getProperty("ClassID")));
+				threads.add(classNode);
+				return;
+			}
+			else {
+				ArrayList<Node> nodes = getNodesToSrcByEdgeType(Long.valueOf((String) node.getProperty("MethodID")), DGEdge.methodInvocation);
+				for (Node n : nodes) {
+					threadName(n, threads);
+				}
+			}
+		}
+		else{
+			return;
+		}
+	}
+	
+	/**
+	 * 静态切片核心函数2：Reachable(src,des)
+	 * @return
+	 */
+	public boolean reachable(Node src,Node des,Node threadNode) {
+		//1.ID合理性判断
+		Long srcID = src.getId();
+		Long desID = des.getId();
+		Long thrID = threadNode.getId();
+		if (srcID==-1||desID==-1||thrID==-1) {
+			return false;
+		}
+		//2.分别获取线程节点到两节点的路径
+		ArrayList<PathImpl> srcPaths = getPaths(thrID, srcID);
+		ArrayList<PathImpl> desPaths = getPaths(thrID, desID);
+		//3.两路径的比较
+		for (PathImpl srcPath : srcPaths) {
+			//(1)ThreadNode-------->srcNode:PATH
+			Iterator<Node> srcNodes = srcPath.nodes().iterator();
+			for (PathImpl desPath : desPaths) {
+				//(2)ThreadNode-------->desNode:PATH
+				Iterator<Node> desNodes = desPath.nodes().iterator();
+				//记录父节点是否可以循环
+				boolean isParentLoop = false;
+				while (desNodes.hasNext()&&srcNodes.hasNext()) {
+					Node srcNode = (Node) srcNodes.next();
+					Node desNode = (Node) desNodes.next();
+					//(3)路径节点ID是否相同
+					if (srcNode.getId()!=desNode.getId()) {
+						//(4)<父节点相同的情形下>比较NodeID大小
+						if (srcNode.getId()<desNode.getId()||isParentLoop) {
+							return true;
+						}
+						else{
+							break;
+						}
+					}
+					else{
+						//(5)父节点循环标记处理
+						if (srcNode.hasProperty("Loop")) {
+							isParentLoop = true;
+						}
+					}
+				}
+			}
+		}
+		return true;
+	}
+	
+	public ArrayList<PathImpl> getPaths(Long from,Long to) {
+		ArrayList<PathImpl> resultPaths = new ArrayList<>();
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query =  " START a=node("+from+"),b=node("+to+")"+ 
+							" MATCH p=a-[:classMember|controlDepd|toObject|typeAnalysis|methodInvocation*]->b"+ 
+							" RETURN p";
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Path not find!");
+				return null;
+			}
+			//存储着结果P:path1,P:path2...
+			ResourceIterator<Map<String, Object>> nodeResult = result.javaIterator();
+			while (nodeResult.hasNext()) {
+				Map<String, Object> map = (Map<String, Object>) nodeResult.next();
+				System.out.println(map);
+				Collection<Object> nodes = map.values();
+				for (Object object : nodes) {
+					System.out.println(object.getClass());
+					if (object instanceof PathImpl) {
+						PathImpl path = (PathImpl)object;
+						resultPaths.add(path);
+					}
+				}
+			}
+			transaction.success();
+		}	
+		finally {
+			transaction.close();
+		}
+		return resultPaths;
+	}
+	
+	/**
+	 * 节点记录处理
+	 * 1.访问过则不用处理
+	 * 2.存入切片(路径：行号)
+	 * @param node ：遍历到的节点
+	 */
+	private void nodeRecordHandle(Node node){
+		Long nodeID = node.getId();
+		if (visitedNodes.contains(nodeID)) {
+			return;
+		}
+		else{
+			visitedNodes.add(nodeID);
+			currentNodes.add(nodeID);
+			if (node.hasProperty("FilePath")&&node.hasProperty("Startline")) {
+				String filePath = (String)node.getProperty("FilePath");
+				Integer startLine = Integer.valueOf((String) node.getProperty("Startline"));
+				if (slices.containsKey(filePath)) {
+					slices.get(filePath).add(startLine);
+				}
+				else{
+					TreeSet<Integer> fileLineSet = new TreeSet<>();
+					fileLineSet.add(startLine);
+					slices.put(filePath, fileLineSet);
+				}
+			}
+			if (node.hasLabel(NEO4JAccess.StatementNode)) {
+				HashSet<Node> threads = new HashSet<>();
+				 /********************语句所在线程名******************/
+				threadName(node, threads);
+				System.out.println(threads);
+			}
+		}
+	}
+
+
+	/**
+	 * 获取语句节点ID
+	 * @param filePath 绝对路径
+	 * @param lineNumber 节点行号
+	 * @return 触发节点的数据库ID号，类型为long
+	 */
+	public long getNodeID(String filePath,int lineNumber) {
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query = "MATCH node WHERE node.FilePath = \""+
+					filePath.replace("\\", "\\\\")+"\" AND node.Startline = \""+
+					lineNumber+"\"  RETURN node";
+			//获取查询结果
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Can not find the statnode");
+				return -1;
+			}
+			//System.out.println(result.dumpToString());直接将结果输出了，result被清空
+			//获取node列
+			ResourceIterator<Node> nodes = result.javaColumnAs("node");
+			if(nodes.hasNext()){
+				Node node = nodes.next();
+				nodeRecordHandle(node);
+				transaction.success();
+				return node.getId();
+			}
+		}	
+		finally {
+			transaction.close();
+		}
+		return -1;
+	}
+
+	 /**
+	  * 返回从源节点经过特定边到达的节点集
+	  * @param src       ：源节点
+	  * @param edgeType  ：边类型
+	  */
+	public void getNodesFromSrcByEdgeType(Long src,DGEdge edgeType){
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query = "START a=node("+src+") MATCH a-[r:"+edgeType+"]->b return b";
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Can not find the nodes!");
+				return ;
+			}
+			//获取node列
+			ResourceIterator<Node> nodes = result.javaColumnAs("b");
+			while(nodes.hasNext()){
+				Node node = nodes.next();	
+				nodeRecordHandle(node);
+				System.out.println(node.getId());
+			}
+			transaction.success();
+		}	
+		finally {
+			transaction.close();
+		}
+	}
+	
+	 /**
+	  * 返回经过特定边到达源节点的节点集
+	  * @param src       ：源节点
+	  * @param edgeType  ：边类型
+	  */
+	public ArrayList<Node> getNodesToSrcByEdgeType(Long src,DGEdge edgeType){
+		ArrayList<Node> resultNodes = new ArrayList<>();
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query = "START b=node("+src+") MATCH a-[r:"+edgeType+"]->b return a";
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Can not find the nodes!");
+				return resultNodes;
+			}
+			//获取node列
+			ResourceIterator<Node> nodes = result.javaColumnAs("a");
+			while(nodes.hasNext()){
+				Node node = nodes.next();	
+				resultNodes.add(node);
+				System.out.println(node.getId());
+			}
+			transaction.success();
+		}	
+		finally {
+			transaction.close();
+		}
+		return resultNodes;
+	}
+	 /**
+	  * 由指定边类型到src节点的节点集
+	  * @param src   ： 源节点
+	  * @param edges ：变类型集
+	  */
+	public void getNodesToSrc(Long src,ArrayList<String> edges){
+		StringBuilder edgeType = new StringBuilder();
+		int size = edges.size();
+		for(int i=0;i<size;++i){
+			edgeType.append(edges.get(i));
+			if (i!=size-1) {
+				edgeType.append("|");
+			}
+		}
+		//开启事务
+		Transaction transaction = database.beginTx();
+		try{
+			//查询语句
+			String query = "START b=node("+src+") MATCH a-[r:"+edgeType.toString()+"]->b return a";
+			System.out.println(query);
+			ExtendedExecutionResult result = engine.execute(query);
+			if (result.isEmpty()) {
+				System.out.println("Can not find the nodes!");
+				return ;
+			}
+			//获取node列
+			ResourceIterator<Node> nodes = result.javaColumnAs("a");
+			while(nodes.hasNext()){
+				Node node = nodes.next();	
+				nodeRecordHandle(node);
+				System.out.println(node.getId());
+			}
+			transaction.success();
+		}
+		finally {
+			transaction.close();
+		}
+	}
+	
+	/**
+	 * 切片节点集初始化
+	 * @param criterion  ： 切片准则
+	 */
+	public void slicePrepare(SliceCriterion criterion) {
+		Long statementID = getNodeID(criterion.filePath, criterion.lineNumber);
+		if (statementID!=-1) {
+			getNodesFromSrcByEdgeType(statementID, DGEdge.toObject);
+			Iterator<Long> iterator = currentNodes.iterator();
+			while (iterator.hasNext()) {
+				Long ID = (Long) iterator.next();
+				getNodesFromSrcByEdgeType(ID, DGEdge.typeAnalysis);
+			}	
+		}
+	}
+
+	/**
+	 * 切片计算
+	 * @param criterion  ：切片准则
+	 */
+	public void sliceHandle(SliceCriterion criterion) {
+		slicePrepare(criterion);
+		System.out.println(currentNodes);
+		System.out.println(visitedNodes);	
+		while(!currentNodes.isEmpty()){
+			HashSet<Long> needToRemoveIDS = (HashSet<Long>) currentNodes.clone();
+			currentNodes.clear();
+			for (Long nodeID : needToRemoveIDS) {
+				getNodesToSrc(nodeID,forwardEdges);
+			}
+		}
+		slicesStorage();
+		System.out.println(slices);
+	}
+	
+	/**
+	 * 切片存储
+	 */
+	public void slicesStorage() {
+		Set<Entry<String, TreeSet<Integer>>> slicesSet = slices.entrySet();
+		for (Entry<String, TreeSet<Integer>> entry : slicesSet) {
+			String filePath = entry.getKey();
+			int startIndex = filePath.indexOf(':');
+			//需存储的文件路径
+			String newFilePath = SliceStoreRootFilePath+filePath.substring(startIndex);
+			int desFileIndex = newFilePath.lastIndexOf('\\');
+			//需存储的目录路径
+			String newDirPath = newFilePath.substring(0, desFileIndex);
+			//目录创建
+			File dir = new File(newDirPath);
+			makeDir(dir);
+			//输出到文件
+			sliceOutputToFile(entry,filePath,newFilePath);
+		}
+	}
+	
+	/**
+	 * 从源文件中读取切到的语句，并将它存储到目标文件中
+	 * @param entry
+	 * @param srcFilePath   ：    源文件
+	 * @param desFilePath   ：    目标文件
+	 */
+	public void sliceOutputToFile(Entry<String, TreeSet<Integer>> entry,String srcFilePath,String desFilePath) {
+		//文件创建
+		File file = new File(desFilePath);
+		if (!file.exists()) {
+			try {
+				file.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		try {
+			PrintWriter printWriter = new PrintWriter(file);
+			BufferedReader srcFileReader = new BufferedReader(
+										   new InputStreamReader(
+										   new FileInputStream(
+										   new File(srcFilePath))));
+			TreeSet<Integer> fileSlices = entry.getValue();
+			int lastLineNumber = entry.getValue().last();
+			for(int i=1;i<=lastLineNumber;++i){
+				if (fileSlices.contains(i)) {
+					try {
+						String line = srcFileReader.readLine();
+						System.out.println("Line:"+i+" "+line);
+						printWriter.println(line);
+						printWriter.flush();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				else{
+					try {
+						String line = srcFileReader.readLine();
+						System.out.println("Line:"+i+" "+line);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			System.out.println(entry.getValue().last());
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * 递归创建目录
+	 * @param file ： 最底端目录
+	 */
+	public void makeDir(File file){
+		if(file.getParentFile().exists()){
+		   file.mkdir();
+		}
+		else{
+		   makeDir(file.getParentFile());
+		   file.mkdir();
+	    }
+	}
+	
+	public static void main(String[] args) {
+		String dataBasePath = "E:\\graph.db";
+		ConcurrentSlicer concurrentSlicer = new ConcurrentSlicer(dataBasePath,"E");
+		//Criterion
+		String filePath = "H:\\Projects\\TestCase\\src\\com\\TestCase01\\Storage.java";
+		int lineNumber = 41;
+		ArrayList<String> vars = new ArrayList<>();
+		vars.add("list");
+		SliceCriterion criterion = new SliceCriterion(filePath, lineNumber, vars);
+		//SliceHandle
+		concurrentSlicer.sliceHandle(criterion);
+		ArrayList<PathImpl> result = concurrentSlicer.getPaths((long)1, (long)97);
+		for (PathImpl pathImpl : result) {
+			Iterator<Node> nodes = pathImpl.nodes().iterator();
+			while (nodes.hasNext()) {
+				Node node = (Node) nodes.next();
+				System.out.println(node.getId());
+			}
+		}
+	}
+}

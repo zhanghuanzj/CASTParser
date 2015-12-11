@@ -1,0 +1,8 @@
+com.TestCase05_ThreadInterrupt02_main_S
+true
+0
+-1
+com.TestCase05_ThreadInterrupt02_run
+true
+0
+-1
